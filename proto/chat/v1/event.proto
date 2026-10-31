@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "chat/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service EventService {
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream EventEnvelope);
+}
+
+message SubscribeEventsRequest {}
+
+message MessageCreated {
+  Message message = 1;
+}
+
+message MessagesRead {
+  string dialog_id = 1;
+  string reader_id = 2;
+  string up_to_message_id = 3;
+  google.protobuf.Timestamp read_at = 4;
+}
+
+message ReactionChanged {
+  string message_id = 1;
+  string user_id = 2;
+  ReactionType reaction = 3;
+  bool removed = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message PresenceChanged {
+  UserSummary user = 1;
+}
+
+message EventEnvelope {
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+
+  oneof payload {
+    MessageCreated message_created = 10;
+    MessagesRead messages_read = 11;
+    ReactionChanged reaction_changed = 12;
+    PresenceChanged presence_changed = 13;
+  }
+}

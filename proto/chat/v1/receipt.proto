@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "google/protobuf/timestamp.proto";
+
+service ReadReceiptService {
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+}
+
+message MarkReadRequest {
+  string dialog_id = 1;
+  string up_to_message_id = 2;
+}
+
+message MarkReadResponse {
+  int64 marked_count = 1;
+  google.protobuf.Timestamp read_at = 2;
+}

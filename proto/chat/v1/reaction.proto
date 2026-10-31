@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "chat/v1/common.proto";
+
+service ReactionService {
+  rpc SetReaction(SetReactionRequest) returns (ReactionState);
+  rpc RemoveReaction(RemoveReactionRequest) returns (RemoveReactionResponse);
+}
+
+message SetReactionRequest {
+  string message_id = 1;
+  ReactionType reaction = 2;
+}
+
+message RemoveReactionRequest {
+  string message_id = 1;
+}
+
+message RemoveReactionResponse {
+  bool removed = 1;
+}

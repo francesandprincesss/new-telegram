@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "chat/v1/common.proto";
+
+service ChatService {
+  rpc CreateDirectDialog(CreateDirectDialogRequest) returns (Dialog);
+  rpc ListDialogs(ListDialogsRequest) returns (ListDialogsResponse);
+}
+
+message CreateDirectDialogRequest {
+  string other_user_id = 1;
+}
+
+message ListDialogsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListDialogsResponse {
+  repeated Dialog dialogs = 1;
+  PageInfo page_info = 2;
+}

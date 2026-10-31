@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "chat/v1/common.proto";
+
+service UserService {
+  rpc GetMe(GetMeRequest) returns (User);
+  rpc FindByUsername(FindByUsernameRequest) returns (UserSummary);
+}
+
+message GetMeRequest {}
+
+message FindByUsernameRequest {
+  string username = 1;
+}

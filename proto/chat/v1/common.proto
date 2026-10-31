@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "google/protobuf/timestamp.proto";
+
+enum PresenceStatus {
+  PRESENCE_STATUS_UNSPECIFIED = 0;
+  PRESENCE_STATUS_ONLINE = 1;
+  PRESENCE_STATUS_IDLE = 2;
+  PRESENCE_STATUS_DND = 3;
+  PRESENCE_STATUS_OFFLINE = 4;
+}
+
+enum ReactionType {
+  REACTION_TYPE_UNSPECIFIED = 0;
+  REACTION_TYPE_LIKE = 1;
+  REACTION_TYPE_LOVE = 2;
+  REACTION_TYPE_LAUGH = 3;
+  REACTION_TYPE_WOW = 4;
+}
+
+message UserSummary {
+  string id = 1;
+  string username = 2;
+  PresenceStatus status = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  PresenceStatus status = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ReactionState {
+  string message_id = 1;
+  string user_id = 2;
+  ReactionType reaction = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message Message {
+  string id = 1;
+  string dialog_id = 2;
+  string sender_id = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp read_at = 6;
+  repeated ReactionState reactions = 7;
+}
+
+message Dialog {
+  string id = 1;
+  UserSummary peer = 2;
+  Message last_message = 3;
+  int64 unread_count = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message PageInfo {
+  string next_page_token = 1;
+}

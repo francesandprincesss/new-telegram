@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1";
+
+import "chat/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service PresenceService {
+  rpc SetStatus(SetStatusRequest) returns (PresenceState);
+}
+
+message SetStatusRequest {
+  PresenceStatus status = 1;
+}
+
+message PresenceState {
+  string user_id = 1;
+  PresenceStatus status = 2;
+  google.protobuf.Timestamp last_seen_at = 3;
+}
