@@ -16,5 +16,5 @@ type Dialog struct {
 
 type Cursor struct {
 	UpdatedAt time.Time
-	ID        uuid.UUID	`gorm:"primaryKey"`
+	ID        uuid.UUID
 }
