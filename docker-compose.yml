@@ -41,12 +41,14 @@ services:
         condition: service_completed_successfully
     environment:
       GRPC_ADDRESS: ${GRPC_ADDRESS:-:50051}
+      HTTP_ADDRESS: ${HTTP_ADDRESS:-:8080}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       JWT_ISSUER: ${JWT_ISSUER:-grpc-chat}
       JWT_TTL: ${JWT_TTL:-24h}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     ports:
       - "50051:50051"
+      - "8080:8080"
     restart: unless-stopped
 
 volumes:

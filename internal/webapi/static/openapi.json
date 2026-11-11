@@ -1,0 +1,40 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "gRPC Chat Browser API",
+    "version": "1.0.0",
+    "description": "HTTP/SSE facade for manually testing the canonical chat.v1 gRPC services."
+  },
+  "servers": [{"url": "http://localhost:8080"}],
+  "tags": [
+    {"name": "Auth", "description": "Public registration and authentication"},
+    {"name": "Users", "description": "JWT-protected user profiles"},
+    {"name": "Presence", "description": "Manual and effective status"},
+    {"name": "Events", "description": "SSE mirror of EventService"}
+  ],
+  "paths": {
+    "/api/v1/auth/register": {"post": {"tags": ["Auth"], "summary": "Register", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Credentials"}}}}, "responses": {"201": {"description": "Created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}}, "409": {"$ref": "#/components/responses/Conflict"}}}},
+    "/api/v1/auth/login": {"post": {"tags": ["Auth"], "summary": "Login", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Credentials"}}}}, "responses": {"200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}},
+    "/api/v1/users/me": {"get": {"tags": ["Users"], "summary": "GetMe", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "Current user", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}},
+    "/api/v1/users/{user_id}": {"get": {"tags": ["Users"], "summary": "GetUser", "security": [{"bearerAuth": []}], "parameters": [{"name": "user_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "responses": {"200": {"description": "User", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}}},
+    "/api/v1/users/find": {"get": {"tags": ["Users"], "summary": "FindUser", "security": [{"bearerAuth": []}], "parameters": [{"name": "username", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_]{3,32}$"}}], "responses": {"200": {"description": "User", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}}},
+    "/api/v1/presence/status": {"put": {"tags": ["Presence"], "summary": "SetStatus", "security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": ["ONLINE", "IDLE", "DND"]}}}}}}, "responses": {"200": {"description": "Effective presence", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Presence"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}}}},
+    "/api/v1/events": {"get": {"tags": ["Events"], "summary": "SubscribeEvents over SSE", "description": "Send Authorization: Bearer header. Native EventSource cannot set it, so use fetch streaming.", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "text/event-stream", "content": {"text/event-stream": {"schema": {"type": "string"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}}
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "schemas": {
+      "Credentials": {"type": "object", "additionalProperties": false, "required": ["username", "password"], "properties": {"username": {"type": "string", "pattern": "^[A-Za-z0-9_]{3,32}$"}, "password": {"type": "string", "format": "password", "description": "From 8 to 72 UTF-8 bytes; the limit is measured in bytes, not Unicode characters."}}},
+      "AuthResponse": {"type": "object", "required": ["access_token", "token_type", "expires_at", "user"], "properties": {"access_token": {"type": "string"}, "token_type": {"const": "Bearer"}, "expires_at": {"type": "string", "format": "date-time"}, "user": {"$ref": "#/components/schemas/User"}}},
+      "User": {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}, "username": {"type": "string"}, "status": {"type": "string", "enum": ["ONLINE", "IDLE", "DND", "OFFLINE"]}, "last_seen_at": {"type": ["string", "null"], "format": "date-time"}, "created_at": {"type": "string", "format": "date-time"}}},
+      "Presence": {"type": "object", "properties": {"user_id": {"type": "string", "format": "uuid"}, "status": {"type": "string", "enum": ["ONLINE", "IDLE", "DND", "OFFLINE"]}, "last_seen_at": {"type": ["string", "null"], "format": "date-time"}}},
+      "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "string"}}}
+    },
+    "responses": {
+      "BadRequest": {"description": "Invalid argument", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Unauthorized": {"description": "Missing or invalid JWT", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "NotFound": {"description": "Resource not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Conflict": {"description": "Username already exists", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    }
+  }
+}

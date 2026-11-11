@@ -5,6 +5,7 @@ import "testing"
 func validEnvironment(t *testing.T) {
 	t.Helper()
 	t.Setenv("GRPC_ADDRESS", ":50051")
+	t.Setenv("HTTP_ADDRESS", ":8080")
 	t.Setenv("DATABASE_URL", "postgres://example")
 	t.Setenv("JWT_ISSUER", "test")
 	t.Setenv("JWT_TTL", "1h")
@@ -32,6 +33,14 @@ func TestLoadValidatesRequiredConfiguration(t *testing.T) {
 	t.Run("invalid ttl", func(t *testing.T) {
 		validEnvironment(t)
 		t.Setenv("JWT_TTL", "0s")
+		if _, err := Load(); err == nil {
+			t.Fatal("Load() expected an error")
+		}
+	})
+
+	t.Run("missing http address", func(t *testing.T) {
+		validEnvironment(t)
+		t.Setenv("HTTP_ADDRESS", "")
 		if _, err := Load(); err == nil {
 			t.Fatal("Load() expected an error")
 		}

@@ -15,5 +15,5 @@ USER app
 
 COPY --from=build /out/grpc-chat-server /usr/local/bin/grpc-chat-server
 
-EXPOSE 50051
+EXPOSE 50051 8080
 ENTRYPOINT ["grpc-chat-server"]
