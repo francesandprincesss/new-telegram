@@ -47,8 +47,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     ports:
       - "50051:50051"
-    # TODO: Enable an explicit production restart policy after main starts a real server.
-    restart: "no"
+    restart: unless-stopped
 
 volumes:
   postgres-data:

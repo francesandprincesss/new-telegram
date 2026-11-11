@@ -8,10 +8,21 @@ import "chat/v1/common.proto";
 
 service UserService {
   rpc GetMe(GetMeRequest) returns (User);
+  rpc GetUser(GetUserRequest) returns (UserSummary);
+  rpc FindUser(FindUserRequest) returns (UserSummary);
+  // Deprecated compatibility alias. New clients should use FindUser.
   rpc FindByUsername(FindByUsernameRequest) returns (UserSummary);
 }
 
 message GetMeRequest {}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message FindUserRequest {
+  string username = 1;
+}
 
 message FindByUsernameRequest {
   string username = 1;

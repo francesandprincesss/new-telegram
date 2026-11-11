@@ -57,6 +57,94 @@ func (*GetMeRequest) Descriptor() ([]byte, []int) {
 	return file_chat_v1_user_proto_rawDescGZIP(), []int{0}
 }
 
+type GetUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserRequest) Reset() {
+	*x = GetUserRequest{}
+	mi := &file_chat_v1_user_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserRequest) ProtoMessage() {}
+
+func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_user_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
+func (*GetUserRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_user_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type FindUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FindUserRequest) Reset() {
+	*x = FindUserRequest{}
+	mi := &file_chat_v1_user_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindUserRequest) ProtoMessage() {}
+
+func (x *FindUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_user_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindUserRequest.ProtoReflect.Descriptor instead.
+func (*FindUserRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_user_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *FindUserRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
 type FindByUsernameRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
@@ -66,7 +154,7 @@ type FindByUsernameRequest struct {
 
 func (x *FindByUsernameRequest) Reset() {
 	*x = FindByUsernameRequest{}
-	mi := &file_chat_v1_user_proto_msgTypes[1]
+	mi := &file_chat_v1_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -78,7 +166,7 @@ func (x *FindByUsernameRequest) String() string {
 func (*FindByUsernameRequest) ProtoMessage() {}
 
 func (x *FindByUsernameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_user_proto_msgTypes[1]
+	mi := &file_chat_v1_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -91,7 +179,7 @@ func (x *FindByUsernameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindByUsernameRequest.ProtoReflect.Descriptor instead.
 func (*FindByUsernameRequest) Descriptor() ([]byte, []int) {
-	return file_chat_v1_user_proto_rawDescGZIP(), []int{1}
+	return file_chat_v1_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *FindByUsernameRequest) GetUsername() string {
@@ -106,11 +194,17 @@ var File_chat_v1_user_proto protoreflect.FileDescriptor
 const file_chat_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"\x12chat/v1/user.proto\x12\achat.v1\x1a\x14chat/v1/common.proto\"\x0e\n" +
-	"\fGetMeRequest\"3\n" +
+	"\fGetMeRequest\")\n" +
+	"\x0eGetUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"-\n" +
+	"\x0fFindUserRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\"3\n" +
 	"\x15FindByUsernameRequest\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername2\x84\x01\n" +
+	"\busername\x18\x01 \x01(\tR\busername2\xfa\x01\n" +
 	"\vUserService\x12-\n" +
-	"\x05GetMe\x12\x15.chat.v1.GetMeRequest\x1a\r.chat.v1.User\x12F\n" +
+	"\x05GetMe\x12\x15.chat.v1.GetMeRequest\x1a\r.chat.v1.User\x128\n" +
+	"\aGetUser\x12\x17.chat.v1.GetUserRequest\x1a\x14.chat.v1.UserSummary\x12:\n" +
+	"\bFindUser\x12\x18.chat.v1.FindUserRequest\x1a\x14.chat.v1.UserSummary\x12F\n" +
 	"\x0eFindByUsername\x12\x1e.chat.v1.FindByUsernameRequest\x1a\x14.chat.v1.UserSummaryB@Z>github.com/francesandprincesss/new-telegram/gen/chat/v1;chatv1b\x06proto3"
 
 var (
@@ -125,20 +219,26 @@ func file_chat_v1_user_proto_rawDescGZIP() []byte {
 	return file_chat_v1_user_proto_rawDescData
 }
 
-var file_chat_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_chat_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_chat_v1_user_proto_goTypes = []any{
 	(*GetMeRequest)(nil),          // 0: chat.v1.GetMeRequest
-	(*FindByUsernameRequest)(nil), // 1: chat.v1.FindByUsernameRequest
-	(*User)(nil),                  // 2: chat.v1.User
-	(*UserSummary)(nil),           // 3: chat.v1.UserSummary
+	(*GetUserRequest)(nil),        // 1: chat.v1.GetUserRequest
+	(*FindUserRequest)(nil),       // 2: chat.v1.FindUserRequest
+	(*FindByUsernameRequest)(nil), // 3: chat.v1.FindByUsernameRequest
+	(*User)(nil),                  // 4: chat.v1.User
+	(*UserSummary)(nil),           // 5: chat.v1.UserSummary
 }
 var file_chat_v1_user_proto_depIdxs = []int32{
 	0, // 0: chat.v1.UserService.GetMe:input_type -> chat.v1.GetMeRequest
-	1, // 1: chat.v1.UserService.FindByUsername:input_type -> chat.v1.FindByUsernameRequest
-	2, // 2: chat.v1.UserService.GetMe:output_type -> chat.v1.User
-	3, // 3: chat.v1.UserService.FindByUsername:output_type -> chat.v1.UserSummary
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	1, // 1: chat.v1.UserService.GetUser:input_type -> chat.v1.GetUserRequest
+	2, // 2: chat.v1.UserService.FindUser:input_type -> chat.v1.FindUserRequest
+	3, // 3: chat.v1.UserService.FindByUsername:input_type -> chat.v1.FindByUsernameRequest
+	4, // 4: chat.v1.UserService.GetMe:output_type -> chat.v1.User
+	5, // 5: chat.v1.UserService.GetUser:output_type -> chat.v1.UserSummary
+	5, // 6: chat.v1.UserService.FindUser:output_type -> chat.v1.UserSummary
+	5, // 7: chat.v1.UserService.FindByUsername:output_type -> chat.v1.UserSummary
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -156,7 +256,7 @@ func file_chat_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chat_v1_user_proto_rawDesc), len(file_chat_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
