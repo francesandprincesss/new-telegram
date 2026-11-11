@@ -20,3 +20,7 @@ type PasswordHasher interface {
 type TokenIssuer interface {
 	Issue(userID uuid.UUID) (token string, expiresAt time.Time, err error)
 }
+
+type TokenVerifier interface {
+	Verify(token string) (uuid.UUID, error)
+}

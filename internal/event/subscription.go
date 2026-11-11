@@ -1,12 +1,23 @@
 package event
 
-import "github.com/google/uuid"
+import (
+	"sync"
+
+	"github.com/google/uuid"
+)
 
 type Subscription struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
 	Events <-chan Event
+	Done   <-chan struct{}
+	cancel func()
+	once   sync.Once
 }
 
-// TODO: Add an idempotent cancellation function owned by Hub. Never close a
-// channel concurrently with a publisher writing to it.
+func (s *Subscription) Cancel() {
+	if s == nil {
+		return
+	}
+	s.once.Do(s.cancel)
+}
