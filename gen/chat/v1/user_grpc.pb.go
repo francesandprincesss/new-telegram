@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	UserService_GetMe_FullMethodName          = "/chat.v1.UserService/GetMe"
+	UserService_GetUser_FullMethodName        = "/chat.v1.UserService/GetUser"
+	UserService_FindUser_FullMethodName       = "/chat.v1.UserService/FindUser"
 	UserService_FindByUsername_FullMethodName = "/chat.v1.UserService/FindByUsername"
 )
 
@@ -28,6 +30,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
 	GetMe(ctx context.Context, in *GetMeRequest, opts ...grpc.CallOption) (*User, error)
+	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*UserSummary, error)
+	FindUser(ctx context.Context, in *FindUserRequest, opts ...grpc.CallOption) (*UserSummary, error)
+	// Deprecated compatibility alias. New clients should use FindUser.
 	FindByUsername(ctx context.Context, in *FindByUsernameRequest, opts ...grpc.CallOption) (*UserSummary, error)
 }
 
@@ -49,6 +54,26 @@ func (c *userServiceClient) GetMe(ctx context.Context, in *GetMeRequest, opts ..
 	return out, nil
 }
 
+func (c *userServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*UserSummary, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserSummary)
+	err := c.cc.Invoke(ctx, UserService_GetUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) FindUser(ctx context.Context, in *FindUserRequest, opts ...grpc.CallOption) (*UserSummary, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserSummary)
+	err := c.cc.Invoke(ctx, UserService_FindUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) FindByUsername(ctx context.Context, in *FindByUsernameRequest, opts ...grpc.CallOption) (*UserSummary, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserSummary)
@@ -64,6 +89,9 @@ func (c *userServiceClient) FindByUsername(ctx context.Context, in *FindByUserna
 // for forward compatibility.
 type UserServiceServer interface {
 	GetMe(context.Context, *GetMeRequest) (*User, error)
+	GetUser(context.Context, *GetUserRequest) (*UserSummary, error)
+	FindUser(context.Context, *FindUserRequest) (*UserSummary, error)
+	// Deprecated compatibility alias. New clients should use FindUser.
 	FindByUsername(context.Context, *FindByUsernameRequest) (*UserSummary, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
@@ -77,6 +105,12 @@ type UnimplementedUserServiceServer struct{}
 
 func (UnimplementedUserServiceServer) GetMe(context.Context, *GetMeRequest) (*User, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMe not implemented")
+}
+func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) (*UserSummary, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUser not implemented")
+}
+func (UnimplementedUserServiceServer) FindUser(context.Context, *FindUserRequest) (*UserSummary, error) {
+	return nil, status.Error(codes.Unimplemented, "method FindUser not implemented")
 }
 func (UnimplementedUserServiceServer) FindByUsername(context.Context, *FindByUsernameRequest) (*UserSummary, error) {
 	return nil, status.Error(codes.Unimplemented, "method FindByUsername not implemented")
@@ -120,6 +154,42 @@ func _UserService_GetMe_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUser(ctx, req.(*GetUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_FindUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).FindUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_FindUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).FindUser(ctx, req.(*FindUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_FindByUsername_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FindByUsernameRequest)
 	if err := dec(in); err != nil {
@@ -148,6 +218,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMe",
 			Handler:    _UserService_GetMe_Handler,
+		},
+		{
+			MethodName: "GetUser",
+			Handler:    _UserService_GetUser_Handler,
+		},
+		{
+			MethodName: "FindUser",
+			Handler:    _UserService_FindUser_Handler,
 		},
 		{
 			MethodName: "FindByUsername",
