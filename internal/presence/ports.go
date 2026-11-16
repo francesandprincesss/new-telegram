@@ -9,7 +9,7 @@ import (
 )
 
 type Repository interface {
-	ManualStatus(ctx context.Context, userID uuid.UUID) (Status, error)
+	Get(ctx context.Context, userID uuid.UUID) (State, error)
 	SetManualStatus(ctx context.Context, userID uuid.UUID, status Status) error
 	SetLastSeen(ctx context.Context, userID uuid.UUID, seenAt time.Time) error
 }

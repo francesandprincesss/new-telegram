@@ -27,4 +27,13 @@ type Credentials struct {
 	UserID       uuid.UUID
 	Username     string
 	PasswordHash string
+	CreatedAt    time.Time
+}
+
+type Result struct {
+	UserID    uuid.UUID
+	Username  string
+	CreatedAt time.Time
+	Token     string
+	ExpiresAt time.Time
 }
