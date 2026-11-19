@@ -41,7 +41,7 @@ func (r *Repo) ListByDialog(ctx context.Context, dialogID uuid.UUID, cursor *Cur
 		query = query.Where("(created_at, id) < (?, ?)", cursor.CreatedAt, cursor.ID)
 	}
 
-	if err := query.Find(&messages).Limit(limit).Order("created_at DESC, id DESC").Error; err != nil {
+	if err := query.Limit(limit).Order("created_at DESC, id DESC").Find(&messages).Error; err != nil {
 		return nil, fmt.Errorf("incorrect find messages: %w", err)
 	}
 
@@ -56,20 +56,21 @@ func (r *Repo) CreateAndTouchDialog(ctx context.Context, message NewMessage) (Me
 			return err
 		}
 
-		query := tx.Table("dialogs").Where("dialog_id = ?", message.DialogID).Update("updated_at = ?", message.CreatedAt)
+		query := tx.Table("dialogs").Where("id = ?", message.DialogID).Update("updated_at", gorm.Expr("GREATEST(updated_at, ?)", msg.CreatedAt))
 
-		if query.RowsAffected == 1 {
-			if err := query.Error; err != nil {
+		if err := query.Error; err != nil {
 				return err
 			}
-		} else {
-			return fmt.Errorf("rowsAffected > 1")
-		}
+
+		if query.RowsAffected != 1 {
+			return fmt.Errorf("expected row updated 1, have: %d", query.RowsAffected)
+		} 
 
 		return nil
+
 	}); if err != nil {
 		return Message{}, fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	return 
+	return msg, nil
 }
