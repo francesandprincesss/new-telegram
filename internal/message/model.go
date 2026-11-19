@@ -7,7 +7,7 @@ import (
 )
 
 type Message struct {
-	ID        uuid.UUID
+	ID        uuid.UUID `gorm:"primaryKey"`
 	DialogID  uuid.UUID
 	SenderID  uuid.UUID
 	Body      string
