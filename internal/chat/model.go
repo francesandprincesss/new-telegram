@@ -7,7 +7,7 @@ import (
 )
 
 type Dialog struct {
-	ID         uuid.UUID
+	ID         uuid.UUID	`gorm:"primaryKey"`
 	UserLowID  uuid.UUID
 	UserHighID uuid.UUID
 	CreatedAt  time.Time
