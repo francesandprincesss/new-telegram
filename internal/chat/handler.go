@@ -13,10 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// TODO: Заполнять peer, last_message и unread_count.
-// Пока эти поля возвращаются с нулевыми значениями.
-// CreateDirectDialog может вернуть уже существующий диалог.
-
 type Handler struct {
 	chatv1.UnimplementedChatServiceServer
 	service *Service
