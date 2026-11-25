@@ -18,7 +18,7 @@ const (
 type Reaction struct {
 	MessageID uuid.UUID
 	UserID    uuid.UUID
-	Type      Type
+	Type      Type `gorm:"column:reaction"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

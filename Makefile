@@ -2,6 +2,7 @@ MODULE := github.com/francesandprincesss/new-telegram
 PROTO_FILES := $(wildcard proto/chat/v1/*.proto)
 PROTOC_GEN_GO := .tools/protoc-gen-go
 PROTOC_GEN_GO_GRPC := .tools/protoc-gen-go-grpc
+GO_PACKAGES := ./cmd/... ./gen/... ./internal/...
 
 .PHONY: proto build test test-race vet migrate-up migrate-down docker-up docker-down
 
@@ -22,16 +23,16 @@ $(PROTOC_GEN_GO_GRPC):
 	go build -o $@ google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
 build:
-	go build ./...
+	go build $(GO_PACKAGES)
 
 test:
-	go test ./...
+	go test $(GO_PACKAGES)
 
 test-race:
-	go test -race ./...
+	go test -race $(GO_PACKAGES)
 
 vet:
-	go vet ./...
+	go vet $(GO_PACKAGES)
 
 migrate-up:
 	docker compose --env-file .env run --rm migrate

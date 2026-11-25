@@ -45,6 +45,15 @@ type invalidTokenStub struct{}
 
 func (invalidTokenStub) Verify(string) (uuid.UUID, error) { return uuid.Nil, errors.New("invalid") }
 
+type expiringTokenStub struct {
+	tokenStub
+	expiry time.Time
+}
+
+func (s expiringTokenStub) VerifyWithExpiry(string) (uuid.UUID, time.Time, error) {
+	return s.userID, s.expiry, nil
+}
+
 type observerStub struct {
 	mu           sync.Mutex
 	connected    int
@@ -71,7 +80,7 @@ func newTestServer() (*Server, uuid.UUID, *observerStub) {
 	server := New(
 		authStub{result: auth.Result{UserID: userID, Username: "alice", CreatedAt: now, Token: "token", ExpiresAt: now.Add(time.Hour)}},
 		userStub{result: user.User{ID: userID, Username: "alice", ManualStatus: string(presence.Online), CreatedAt: now}},
-		presenceStub{}, tokenStub{userID: userID}, event.NewHub(4), observer,
+		presenceStub{}, tokenStub{userID: userID}, event.NewHub(4), observer, Messaging{},
 	)
 	return server, userID, observer
 }
@@ -111,7 +120,7 @@ func TestProtectedRouteRequiresBearerToken(t *testing.T) {
 
 func TestProtectedRouteRejectsInvalidToken(t *testing.T) {
 	server, _, observer := newTestServer()
-	server = New(server.auth, server.users, server.presence, invalidTokenStub{}, server.hub, observer)
+	server = New(server.auth, server.users, server.presence, invalidTokenStub{}, server.hub, observer, Messaging{})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
 	request.Header.Set("Authorization", "Bearer invalid")
 	response := httptest.NewRecorder()
@@ -223,4 +232,25 @@ func TestEventStreamTracksConnectionLifecycle(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("event stream did not call Connected and Disconnected exactly once")
+}
+
+func TestEventStreamClosesAtTokenExpiry(t *testing.T) {
+	server, userID, observer := newTestServer()
+	server.tokens = expiringTokenStub{tokenStub{userID}, time.Now().Add(50 * time.Millisecond)}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/events", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		server.Handler().ServeHTTP(response, request)
+		close(done)
+	}()
+	select {
+	case <-done:
+		if response.Code != http.StatusOK || observer.connected != 1 || observer.disconnected != 1 {
+			t.Fatalf("stream response %d, connected %d, disconnected %d", response.Code, observer.connected, observer.disconnected)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("event stream did not stop at the token deadline")
+	}
 }

@@ -30,13 +30,14 @@ import (
 var staticFiles embed.FS
 
 type Server struct {
-	auth     authService
-	users    userService
-	presence presenceService
-	tokens   auth.TokenVerifier
-	hub      eventSubscriber
-	observer event.ConnectionObserver
-	handler  http.Handler
+	auth      authService
+	users     userService
+	presence  presenceService
+	tokens    auth.TokenVerifier
+	hub       eventSubscriber
+	observer  event.ConnectionObserver
+	messaging Messaging
+	handler   http.Handler
 }
 
 type authService interface {
@@ -57,8 +58,12 @@ type eventSubscriber interface {
 	Subscribe(uuid.UUID) *event.Subscription
 }
 
-func New(authService authService, userService userService, presenceService presenceService, tokens auth.TokenVerifier, hub eventSubscriber, observer event.ConnectionObserver) *Server {
-	s := &Server{auth: authService, users: userService, presence: presenceService, tokens: tokens, hub: hub, observer: observer}
+type expiringVerifier interface {
+	VerifyWithExpiry(string) (uuid.UUID, time.Time, error)
+}
+
+func New(authService authService, userService userService, presenceService presenceService, tokens auth.TokenVerifier, hub eventSubscriber, observer event.ConnectionObserver, messaging Messaging) *Server {
+	s := &Server{auth: authService, users: userService, presence: presenceService, tokens: tokens, hub: hub, observer: observer, messaging: messaging}
 	s.handler = s.routes()
 	return s
 }
@@ -79,6 +84,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("GET /api/v1/users/{user_id}", s.authenticate(requestTimeout(http.HandlerFunc(s.getUser))))
 	mux.Handle("PUT /api/v1/presence/status", s.authenticate(requestTimeout(http.HandlerFunc(s.setStatus))))
 	mux.Handle("GET /api/v1/events", s.authenticate(http.HandlerFunc(s.events)))
+	s.registerMessagingRoutes(mux)
 	assets, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		panic(err)
@@ -206,6 +212,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case value := <-subscription.Events:
+			if r.Context().Err() != nil {
+				return
+			}
 			payload, err := json.Marshal(eventResult(value))
 			if err != nil {
 				continue
@@ -234,12 +243,25 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authorization token is required"})
 			return
 		}
-		userID, err := s.tokens.Verify(parts[1])
+		var userID uuid.UUID
+		var err error
+		ctx := r.Context()
+		if verifier, ok := s.tokens.(expiringVerifier); ok {
+			var expiry time.Time
+			userID, expiry, err = verifier.VerifyWithExpiry(parts[1])
+			if err == nil && r.URL.Path == "/api/v1/events" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(ctx, expiry)
+				defer cancel()
+			}
+		} else {
+			userID, err = s.tokens.Verify(parts[1])
+		}
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid authorization token"})
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(session.WithUserID(r.Context(), userID)))
+		next.ServeHTTP(w, r.WithContext(session.WithUserID(ctx, userID)))
 	})
 }
 

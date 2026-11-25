@@ -14,10 +14,14 @@ import (
 
 	chatv1 "github.com/francesandprincesss/new-telegram/gen/chat/v1"
 	"github.com/francesandprincesss/new-telegram/internal/auth"
+	"github.com/francesandprincesss/new-telegram/internal/chat"
 	"github.com/francesandprincesss/new-telegram/internal/config"
 	"github.com/francesandprincesss/new-telegram/internal/database"
 	"github.com/francesandprincesss/new-telegram/internal/event"
+	"github.com/francesandprincesss/new-telegram/internal/message"
 	"github.com/francesandprincesss/new-telegram/internal/presence"
+	"github.com/francesandprincesss/new-telegram/internal/reaction"
+	"github.com/francesandprincesss/new-telegram/internal/readreceipt"
 	"github.com/francesandprincesss/new-telegram/internal/user"
 	"github.com/francesandprincesss/new-telegram/internal/webapi"
 	"google.golang.org/grpc"
@@ -48,6 +52,14 @@ func run() error {
 	presenceManager := presence.NewManager(presenceRepository, presence.NewPeerRepository(db), hub)
 	presenceService := presence.NewService(presenceManager)
 	userService := user.NewService(user.NewRepository(db), presenceManager)
+	chatService := chat.NewService(chat.NewRepository(db), userService)
+	messageService := message.NewService(message.NewRepository(db), chatService, hub)
+	messaging := webapi.Messaging{
+		Dialogs:   chatService,
+		Messages:  messageService,
+		Receipts:  readreceipt.NewService(readreceipt.NewRepository(db), messageService, hub),
+		Reactions: reaction.NewService(reaction.NewRepository(db), messageService, hub),
+	}
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.TTL)
 	authService := auth.NewService(auth.NewRepository(db), auth.NewBcryptHasher(0), jwtManager)
 	authInterceptor := auth.NewInterceptor(jwtManager)
@@ -58,7 +70,7 @@ func run() error {
 	chatv1.RegisterPresenceServiceServer(grpcServer, presence.NewHandler(presenceService))
 	chatv1.RegisterEventServiceServer(grpcServer, event.NewHandler(hub, presenceManager))
 	httpServer := &http.Server{
-		Handler:           webapi.New(authService, userService, presenceService, jwtManager, hub, presenceManager).Handler(),
+		Handler:           webapi.New(authService, userService, presenceService, jwtManager, hub, presenceManager, messaging).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		IdleTimeout:       60 * time.Second,

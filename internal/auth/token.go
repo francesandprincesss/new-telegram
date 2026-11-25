@@ -31,6 +31,12 @@ func (m *JWTManager) Issue(userID uuid.UUID) (string, time.Time, error) {
 }
 
 func (m *JWTManager) Verify(raw string) (uuid.UUID, error) {
+	userID, _, err := m.VerifyWithExpiry(raw)
+	return userID, err
+}
+
+// VerifyWithExpiry exposes the verified deadline for long-lived connections.
+func (m *JWTManager) VerifyWithExpiry(raw string) (uuid.UUID, time.Time, error) {
 	claims := &jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
@@ -39,11 +45,11 @@ func (m *JWTManager) Verify(raw string) (uuid.UUID, error) {
 		return m.secret, nil
 	}, jwt.WithIssuer(m.issuer), jwt.WithExpirationRequired(), jwt.WithIssuedAt(), jwt.WithTimeFunc(m.now))
 	if err != nil || !token.Valid {
-		return uuid.Nil, fmt.Errorf("invalid token")
+		return uuid.Nil, time.Time{}, fmt.Errorf("invalid token")
 	}
 	userID, err := uuid.Parse(claims.Subject)
 	if err != nil || userID == uuid.Nil {
-		return uuid.Nil, fmt.Errorf("invalid token subject")
+		return uuid.Nil, time.Time{}, fmt.Errorf("invalid token subject")
 	}
-	return userID, nil
+	return userID, claims.ExpiresAt.Time, nil
 }

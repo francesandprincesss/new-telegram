@@ -154,6 +154,29 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 `EventSource` не позволяет установить Bearer header. Очереди на подключение
 ограничены; медленный consumer отключается, чтобы не задерживать остальных.
 
+## Диалоги и сообщения
+
+Фронтенд на Next.js передаёт запросы этому API. Браузер получает HttpOnly-cookie
+сессии, а Next.js подставляет Bearer-токен при обращении к Go-серверу.
+При прямых вызовах Go API по-прежнему передавайте Bearer-токен.
+
+| HTTP | Тело запроса | Ответ |
+|---|---|---|
+| `GET /api/v1/dialogs` | — | `{dialogs, page_info}` |
+| `POST /api/v1/dialogs` | `{other_user_id}` | Новый или существующий личный диалог |
+| `GET /api/v1/dialogs/{dialog_id}/messages` | — | `{messages, page_info}` |
+| `POST /api/v1/dialogs/{dialog_id}/messages` | `{body}` | Отправленное сообщение |
+| `POST /api/v1/dialogs/{dialog_id}/read` | `{up_to_message_id}` | `{marked_count, read_at}` |
+| `PUT /api/v1/messages/{message_id}/reaction` | `{reaction}` | Реакция пользователя |
+| `DELETE /api/v1/messages/{message_id}/reaction` | — | `{removed}` |
+
+Списки возвращаются от новых записей к старым. Для следующей страницы передайте
+`page_info.next_page_token` как `page_token`. Размер страницы можно задать
+параметром `page_size`. Текст сообщения ограничен 4000 символами.
+Допустимые реакции: `LIKE`, `LOVE`, `LAUGH`, `WOW`.
+Участники диалога получают события `message.created`, `messages.read` и
+`reaction.changed`. После переподключения клиент запрашивает актуальные данные.
+
 ## HTTP-коды ошибок
 
 | HTTP | gRPC | Значение |
@@ -188,6 +211,5 @@ Presence Manager и Event Hub находятся в памяти одного п
 для текущего модульного монолита и локального запуска. Для нескольких экземпляров
 сервера потребуются общий presence registry и pub/sub, например Redis или NATS.
 
-HTTP facade предназначен для разработки и ручного тестирования. Канонические
-контракты находятся в `proto/chat/v1`, а схема базы изменяется только SQL-файлами
-из `migrations`; `AutoMigrate` не используется.
+HTTP facade обслуживает браузерный клиент и консоль. Контракты gRPC находятся
+в `proto/chat/v1`. Схема базы изменяется SQL-миграциями из `migrations`.
