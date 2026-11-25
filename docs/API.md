@@ -14,7 +14,7 @@ OpenAPI 3.1: <http://localhost:8080/openapi.json>.
 
 ```bash
 cp .env.example .env
-# Замените POSTGRES_PASSWORD, DATABASE_URL и JWT_SECRET.
+# Задайте POSTGRES_PASSWORD, DATABASE_URL, JWT_SECRET и MESSAGE_ENCRYPTION_KEY (openssl rand -base64 32).
 docker compose --env-file .env up --build
 ```
 
@@ -38,7 +38,7 @@ authorization: Bearer <access_token>
 - gRPC: `chat.v1.AuthService/Register`
 - HTTP: `POST /api/v1/auth/register`
 - username: `^[A-Za-z0-9_]{3,32}$`, уникален без учёта регистра;
-- password: от 8 до 72 байт, хранится только как bcrypt hash.
+- password: от 8 до 72 кодовых точек Unicode при регистрации. Новые пароли хешируются с помощью Argon2id.
 
 ```bash
 curl -s http://localhost:8080/api/v1/auth/register \
@@ -63,8 +63,8 @@ curl -s http://localhost:8080/api/v1/auth/login \
   -d '{"username":"alice","password":"password123"}'
 ```
 
-Неизвестный username и неверный пароль возвращают одинаковую ошибку и выполняют
-bcrypt-сравнение, чтобы не раскрывать существование аккаунта по ответу или времени.
+Неизвестное имя пользователя и неверный пароль возвращают одинаковую ошибку.
+Старые аккаунты по-прежнему могут войти с паролями, зарегистрированными по правилам bcrypt.
 
 ## Пользователи
 
@@ -203,6 +203,7 @@ HTTP-ответ:
 | `DATABASE_URL` | `postgres://...` | DSN PostgreSQL |
 | `JWT_ISSUER` | `grpc-chat` | Проверяемый issuer JWT |
 | `JWT_TTL` | `24h` | Положительное время жизни токена |
+| `MESSAGE_ENCRYPTION_KEY` | `openssl rand -base64 32` | Ключ шифрования истории сообщений |
 | `JWT_SECRET` | 32+ random bytes | HS256 secret; не коммитить в репозиторий |
 
 ## Архитектурные ограничения

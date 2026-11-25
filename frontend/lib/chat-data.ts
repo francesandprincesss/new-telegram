@@ -73,12 +73,13 @@ export function mergeDialogs(previous: Dialog[], fresh: Dialog[]) {
   );
 }
 
-export function validateCredentials(username: string, password: string) {
+export function validateCredentials(username: string, password: string, registering: boolean) {
   if (!/^[A-Za-z0-9_]{3,32}$/.test(username)) {
     return "Имя пользователя должно содержать 3–32 латинские буквы, цифры или подчёркивания";
   }
-  const bytes = new TextEncoder().encode(password).length;
-  if (bytes < 8 || bytes > 72) return "Длина пароля должна быть от 8 до 72 байт";
+  const length = Array.from(password).length;
+  if (registering && (length < 8 || length > 72)) return "Длина пароля должна быть от 8 до 72 символов";
+  if (!registering && (length === 0 || length > 72)) return "Проверьте имя пользователя и пароль";
   return "";
 }
 

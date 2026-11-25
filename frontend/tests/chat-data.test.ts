@@ -14,10 +14,16 @@ test("history deduplicates by ID and preserves PostgreSQL timestamp order", () =
   assert.deepEqual(mergeMessages([second, third], [read, first]), [first, read, third]);
 });
 
-test("validation counts UTF-8 password bytes and trimmed Unicode message characters", () => {
-  assert.ok(validateCredentials("ab", "abcdefgh"));
-  assert.equal(validateCredentials("user_12", "🙂".repeat(18)), "");
-  assert.ok(validateCredentials("user_12", "🙂".repeat(19)));
+test("registration counts Unicode code points while login accepts short legacy passwords", () => {
+  assert.ok(validateCredentials("ab", "abcdefgh", true));
+  assert.equal(validateCredentials("user_12", "я".repeat(8), true), "");
+  assert.equal(validateCredentials("user_12", "🙂".repeat(72), true), "");
+  assert.ok(validateCredentials("user_12", "🙂".repeat(73), true));
+  assert.ok(validateCredentials("user_12", "🙂".repeat(7), true));
+  assert.equal(validateCredentials("user_12", "🙂🙂", false), "");
+});
+
+test("message validation counts trimmed Unicode code points", () => {
   assert.ok(validateMessage(" \n "));
   assert.equal(validateMessage(" " + "🙂".repeat(4000) + " "), "");
   assert.ok(validateMessage("🙂".repeat(4001)));

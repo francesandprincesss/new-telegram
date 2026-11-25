@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -11,10 +12,11 @@ import (
 // Config contains process-level configuration. Secrets must be supplied via
 // environment variables and must never be committed to the repository.
 type Config struct {
-	GRPCAddress string
-	HTTPAddress string
-	DatabaseURL string
-	JWT         JWTConfig
+	GRPCAddress          string
+	HTTPAddress          string
+	DatabaseURL          string
+	MessageEncryptionKey []byte
+	JWT                  JWTConfig
 }
 
 type JWTConfig struct {
@@ -49,5 +51,10 @@ func Load() (Config, error) {
 	if len(cfg.JWT.Secret) < 32 {
 		return Config{}, fmt.Errorf("JWT_SECRET must contain at least 32 bytes")
 	}
+	key, err := base64.StdEncoding.Strict().DecodeString(os.Getenv("MESSAGE_ENCRYPTION_KEY"))
+	if err != nil || len(key) != 32 {
+		return Config{}, fmt.Errorf("MESSAGE_ENCRYPTION_KEY must be 32 random bytes encoded in standard base64")
+	}
+	cfg.MessageEncryptionKey = key
 	return cfg, nil
 }

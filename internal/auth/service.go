@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
 	"github.com/google/uuid"
@@ -18,11 +19,12 @@ type Service struct {
 	passwords  PasswordHasher
 	tokens     TokenIssuer
 	dummyHash  string
+	hashing    chan struct{}
 }
 
 func NewService(repository Repository, passwords PasswordHasher, tokens TokenIssuer) *Service {
 	dummyHash, _ := passwords.Hash("invalid-password-placeholder")
-	return &Service{repository: repository, passwords: passwords, tokens: tokens, dummyHash: dummyHash}
+	return &Service{repository: repository, passwords: passwords, tokens: tokens, dummyHash: dummyHash, hashing: make(chan struct{}, 4)}
 }
 
 func (s *Service) Register(ctx context.Context, username, password string) (Result, error) {
@@ -32,7 +34,11 @@ func (s *Service) Register(ctx context.Context, username, password string) (Resu
 	if err := validatePassword(password); err != nil {
 		return Result{}, apperror.New(apperror.CodeInvalidArgument, err.Error())
 	}
+	if err := s.acquireHashSlot(ctx); err != nil {
+		return Result{}, err
+	}
 	hash, err := s.passwords.Hash(password)
+	<-s.hashing
 	if err != nil {
 		return Result{}, apperror.Wrap(apperror.CodeInternal, "could not hash password", err)
 	}
@@ -46,9 +52,13 @@ func (s *Service) Register(ctx context.Context, username, password string) (Resu
 
 func (s *Service) Login(ctx context.Context, username, password string) (Result, error) {
 	invalid := apperror.New(apperror.CodeUnauthenticated, "invalid username or password")
-	if !usernamePattern.MatchString(username) || validatePassword(password) != nil {
+	if !usernamePattern.MatchString(username) || !utf8.ValidString(password) || password == "" || utf8.RuneCountInString(password) > maxPasswordCharacters {
 		return Result{}, invalid
 	}
+	if err := s.acquireHashSlot(ctx); err != nil {
+		return Result{}, err
+	}
+	defer func() { <-s.hashing }()
 	credentials, err := s.repository.FindCredentialsByNormalizedUsername(ctx, strings.ToLower(username))
 	if err != nil {
 		if apperror.CodeOf(err) == apperror.CodeNotFound {
@@ -61,6 +71,17 @@ func (s *Service) Login(ctx context.Context, username, password string) (Result,
 		return Result{}, invalid
 	}
 	return s.issue(credentials.UserID, credentials.Username, credentials.CreatedAt)
+}
+
+// Limit concurrent password work across both registration and login so Argon2id
+// cannot allocate its working memory for every concurrent request.
+func (s *Service) acquireHashSlot(ctx context.Context) error {
+	select {
+	case s.hashing <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *Service) issue(userID uuid.UUID, username string, createdAt time.Time) (Result, error) {

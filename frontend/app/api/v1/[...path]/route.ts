@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (!routes[method]?.test(endpoint)) return failure(404, "Маршрут не найден");
 
   const origin = request.headers.get("origin");
-  const publicOrigin = process.env.CHAT_APP_ORIGIN ??
+  const publicOrigin = process.env.CHAT_APP_ORIGIN ||
     `${request.nextUrl.protocol}//${request.headers.get("host") ?? request.nextUrl.host}`;
   if (method !== "GET" && ((origin && origin !== publicOrigin) || request.headers.get("sec-fetch-site") === "cross-site")) {
     return failure(403, "Запрос с другого сайта отклонён");

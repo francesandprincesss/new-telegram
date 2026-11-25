@@ -16,7 +16,7 @@ export function AuthForm({ onSignIn }: { onSignIn: (user: User) => void }) {
     event.preventDefault();
     if (busy) return;
     const name = username.trim();
-    const validation = validateCredentials(name, password);
+    const validation = validateCredentials(name, password, registering);
     setError(validation);
     if (validation) return;
     setBusy(true);
@@ -41,7 +41,9 @@ export function AuthForm({ onSignIn }: { onSignIn: (user: User) => void }) {
         </label>
         <label className="form-label">Пароль
           <input className="field" type="password" value={password} onChange={e => setPassword(e.target.value)}
-            autoComplete={registering ? "new-password" : "current-password"} required />
+            autoComplete={registering ? "new-password" : "current-password"}
+            aria-describedby={registering ? "registration-password-hint" : undefined} required />
+          {registering && <small id="registration-password-hint">От 8 до 72 символов</small>}
         </label>
         {error && <p className="error-text" role="alert">{error}</p>}
         <button type="submit" className="action" disabled={busy}>

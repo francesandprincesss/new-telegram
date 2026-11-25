@@ -8,6 +8,7 @@ import (
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type repositoryStub struct {
@@ -79,5 +80,23 @@ func TestServiceLoginUsesUniformCredentialErrorAndDummyCompare(t *testing.T) {
 				t.Fatalf("password comparisons = %d, want 1", passwords.compares)
 			}
 		})
+	}
+}
+
+func TestLoginAcceptsShortLegacyUnicodePassword(t *testing.T) {
+	const password = "🙂🙂"
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := uuid.New()
+	repository := &repositoryStub{credentials: Credentials{UserID: id, Username: "alice", PasswordHash: string(hash)}}
+	service := NewService(repository, Argon2idHasher{}, tokenStub{})
+	result, err := service.Login(context.Background(), "alice", password)
+	if err != nil || result.UserID != id {
+		t.Fatalf("legacy login failed: %v", err)
+	}
+	if _, err := service.Register(context.Background(), "other", password); apperror.CodeOf(err) != apperror.CodeInvalidArgument {
+		t.Fatalf("registering with a legacy password returned %v", err)
 	}
 }

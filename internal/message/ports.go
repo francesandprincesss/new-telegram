@@ -12,7 +12,7 @@ type Repository interface {
 	CreateAndTouchDialog(ctx context.Context, message NewMessage) (Message, error)
 	ListByDialog(ctx context.Context, dialogID uuid.UUID, cursor *Cursor, limit int) ([]Message, error)
 	CountUnread(ctx context.Context, dialogID, userID uuid.UUID) (int64, error)
-	GetByID(ctx context.Context, messageID uuid.UUID) (Message, error)
+	GetMetadataByID(ctx context.Context, messageID uuid.UUID) (Message, error)
 }
 
 type DialogAccess interface {

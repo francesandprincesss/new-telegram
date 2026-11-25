@@ -46,9 +46,10 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-grpc-chat}
       JWT_TTL: ${JWT_TTL:-24h}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      MESSAGE_ENCRYPTION_KEY: ${MESSAGE_ENCRYPTION_KEY:?MESSAGE_ENCRYPTION_KEY is required}
     ports:
-      - "50051:50051"
-      - "8080:8080"
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
 
   frontend:
@@ -57,6 +58,7 @@ services:
       - server
     environment:
       CHAT_API_ORIGIN: http://server:8080
+      CHAT_APP_ORIGIN: ${CHAT_APP_ORIGIN:-}
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped

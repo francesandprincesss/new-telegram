@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"encoding/base64"
+	"testing"
+)
 
 func validEnvironment(t *testing.T) {
 	t.Helper()
@@ -10,6 +13,7 @@ func validEnvironment(t *testing.T) {
 	t.Setenv("JWT_ISSUER", "test")
 	t.Setenv("JWT_TTL", "1h")
 	t.Setenv("JWT_SECRET", "01234567890123456789012345678901")
+	t.Setenv("MESSAGE_ENCRYPTION_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
 }
 
 func TestLoadValidatesRequiredConfiguration(t *testing.T) {
@@ -18,8 +22,8 @@ func TestLoadValidatesRequiredConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.GRPCAddress != ":50051" || cfg.JWT.TTL.String() != "1h0m0s" {
-		t.Fatalf("unexpected config: %+v", cfg)
+	if cfg.GRPCAddress != ":50051" || cfg.JWT.TTL.String() != "1h0m0s" || len(cfg.MessageEncryptionKey) != 32 {
+		t.Fatal("unexpected configuration")
 	}
 
 	t.Run("short secret", func(t *testing.T) {
@@ -45,4 +49,14 @@ func TestLoadValidatesRequiredConfiguration(t *testing.T) {
 			t.Fatal("Load() expected an error")
 		}
 	})
+}
+
+func TestLoadRejectsInvalidMessageEncryptionKeys(t *testing.T) {
+	for _, key := range []string{"", "not base64", base64.StdEncoding.EncodeToString(make([]byte, 31))} {
+		validEnvironment(t)
+		t.Setenv("MESSAGE_ENCRYPTION_KEY", key)
+		if _, err := Load(); err == nil {
+			t.Fatal("Load() accepted an invalid message encryption key")
+		}
+	}
 }

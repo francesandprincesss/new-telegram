@@ -5,7 +5,7 @@ import { readEventStream } from "../lib/sse.ts";
 
 const base = new URL(process.env.CHAT_TEST_ORIGIN ?? "http://127.0.0.1:3000").origin;
 const suffix = randomBytes(5).toString("hex");
-const password = randomBytes(18).toString("hex");
+const password = "🔒".repeat(72 - suffix.length) + suffix;
 
 function client() {
   let cookie = "";
@@ -76,7 +76,12 @@ const outsider = client();
 
 assert.equal((await alice("/dialogs")).status, 401);
 assert.equal((await alice("/auth/login", "POST", { username: "alice", password }, "https://example.org")).status, 403);
+await json(await alice("/auth/register", "POST", { username: "short_" + suffix, password: "🙂".repeat(7) }), 400);
+await json(await alice("/auth/register", "POST", { username: "long_" + suffix, password: password + "x" }), 400);
 const a = await register(alice, "alice_");
+const signIn = client();
+await json(await signIn("/auth/login", "POST", { username: a.username, password: password.slice(0, -1) + "🔑" }), 401);
+await json(await signIn("/auth/login", "POST", { username: a.username, password }), 200);
 const b = await register(bob, "bob_");
 await register(outsider, "other_");
 assert.equal((await json<Identity>(await alice("/users/find?username=" + b.username.toUpperCase()), 200)).id, b.id);

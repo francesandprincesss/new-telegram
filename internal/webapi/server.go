@@ -203,7 +203,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-store, no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	_, _ = io.WriteString(w, ": connected\n\n")
 	flusher.Flush()

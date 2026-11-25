@@ -24,7 +24,7 @@
   "components": {
     "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
     "schemas": {
-      "Credentials": {"type": "object", "additionalProperties": false, "required": ["username", "password"], "properties": {"username": {"type": "string", "pattern": "^[A-Za-z0-9_]{3,32}$"}, "password": {"type": "string", "format": "password", "description": "From 8 to 72 UTF-8 bytes; the limit is measured in bytes, not Unicode characters."}}},
+      "Credentials": {"type": "object", "additionalProperties": false, "required": ["username", "password"], "properties": {"username": {"type": "string", "pattern": "^[A-Za-z0-9_]{3,32}$"}, "password": {"type": "string", "format": "password", "description": "For registration, 8 to 72 Unicode code points. Login also accepts existing legacy passwords."}}},
       "AuthResponse": {"type": "object", "required": ["access_token", "token_type", "expires_at", "user"], "properties": {"access_token": {"type": "string"}, "token_type": {"const": "Bearer"}, "expires_at": {"type": "string", "format": "date-time"}, "user": {"$ref": "#/components/schemas/User"}}},
       "User": {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}, "username": {"type": "string"}, "status": {"type": "string", "enum": ["ONLINE", "IDLE", "DND", "OFFLINE"]}, "last_seen_at": {"type": ["string", "null"], "format": "date-time"}, "created_at": {"type": "string", "format": "date-time"}}},
       "Presence": {"type": "object", "properties": {"user_id": {"type": "string", "format": "uuid"}, "status": {"type": "string", "enum": ["ONLINE", "IDLE", "DND", "OFFLINE"]}, "last_seen_at": {"type": ["string", "null"], "format": "date-time"}}},

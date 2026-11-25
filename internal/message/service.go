@@ -103,7 +103,7 @@ func (s *Service) EnsureMessageParticipant(
 	messageID uuid.UUID,
 	userID uuid.UUID,
 ) (dialogID uuid.UUID, senderID uuid.UUID, participants [2]uuid.UUID, err error) {
-	message, err := s.repository.GetByID(ctx, messageID)
+	message, err := s.repository.GetMetadataByID(ctx, messageID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, participants, err
 	}

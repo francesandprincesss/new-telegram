@@ -53,7 +53,14 @@ func run() error {
 	presenceService := presence.NewService(presenceManager)
 	userService := user.NewService(user.NewRepository(db), presenceManager)
 	chatService := chat.NewService(chat.NewRepository(db), userService)
-	messageService := message.NewService(message.NewRepository(db), chatService, hub)
+	messageRepository, err := message.NewRepository(db, cfg.MessageEncryptionKey)
+	if err != nil {
+		return err
+	}
+	if err := messageRepository.ProtectStoredMessages(ctx); err != nil {
+		return err
+	}
+	messageService := message.NewService(messageRepository, chatService, hub)
 	messaging := webapi.Messaging{
 		Dialogs:   chatService,
 		Messages:  messageService,
@@ -61,7 +68,7 @@ func run() error {
 		Reactions: reaction.NewService(reaction.NewRepository(db), messageService, hub),
 	}
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.TTL)
-	authService := auth.NewService(auth.NewRepository(db), auth.NewBcryptHasher(0), jwtManager)
+	authService := auth.NewService(auth.NewRepository(db), auth.Argon2idHasher{}, jwtManager)
 	authInterceptor := auth.NewInterceptor(jwtManager)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary()), grpc.StreamInterceptor(authInterceptor.Stream()))
