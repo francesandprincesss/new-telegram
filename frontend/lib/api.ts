@@ -58,7 +58,8 @@ export const api = {
     request<Dialog>("/dialogs", { method: "POST", data: { other_user_id: userId }, signal }),
   messages: (id: string, token = "", signal?: AbortSignal) =>
     request<{ messages: Message[]; page_info: PageInfo }>(`/dialogs/${id}/messages` + page(token), { signal }),
-  send: (id: string, body: string) => request<Message>(`/dialogs/${id}/messages`, { method: "POST", data: { body } }),
+  send: (id: string, body: string, replyTo?: string) =>
+    request<Message>(`/dialogs/${id}/messages`, { method: "POST", data: { body, reply_to_message_id: replyTo } }),
   read: (id: string, messageId: string, signal?: AbortSignal) =>
     request<unknown>(`/dialogs/${id}/read`, { method: "POST", data: { up_to_message_id: messageId }, signal }),
   react: (id: string, reaction: ReactionKind | null) => reaction

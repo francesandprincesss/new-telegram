@@ -51,7 +51,11 @@ func eventResult(value event.Event) map[string]any {
 	case event.PresenceChanged:
 		result["payload"] = map[string]any{"user_id": payload.UserID, "status": payload.Status, "last_seen_at": payload.LastSeenAt}
 	case event.MessageCreated:
-		result["payload"] = map[string]any{"message_id": payload.MessageID, "dialog_id": payload.DialogID, "sender_id": payload.SenderID, "body": payload.Body, "created_at": payload.CreatedAt}
+		messagePayload := map[string]any{"message_id": payload.MessageID, "dialog_id": payload.DialogID, "sender_id": payload.SenderID, "body": payload.Body, "created_at": payload.CreatedAt}
+		if payload.ReplyToID != nil {
+			messagePayload["reply_to_message_id"] = *payload.ReplyToID
+		}
+		result["payload"] = messagePayload
 	case event.MessagesRead:
 		result["payload"] = map[string]any{"dialog_id": payload.DialogID, "reader_id": payload.ReaderID, "up_to_message_id": payload.UpToMessageID, "read_at": payload.ReadAt}
 	case event.ReactionChanged:

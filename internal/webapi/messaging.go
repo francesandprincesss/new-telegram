@@ -21,7 +21,7 @@ type dialogService interface {
 }
 
 type messageService interface {
-	SendMessage(context.Context, uuid.UUID, uuid.UUID, string) (message.Message, error)
+	SendMessage(context.Context, uuid.UUID, uuid.UUID, string, *uuid.UUID) (message.Message, error)
 	ListMessages(context.Context, uuid.UUID, uuid.UUID, int, string) ([]message.Message, string, error)
 	DialogSummary(context.Context, uuid.UUID, uuid.UUID) (*message.Message, int64, error)
 }
@@ -84,6 +84,13 @@ type messageResponse struct {
 	CreatedAt time.Time          `json:"created_at"`
 	ReadAt    *time.Time         `json:"read_at"`
 	Reactions []reactionResponse `json:"reactions"`
+	ReplyTo   *replyResponse     `json:"reply_to,omitempty"`
+}
+
+type replyResponse struct {
+	ID       uuid.UUID `json:"id"`
+	SenderID uuid.UUID `json:"sender_id"`
+	Excerpt  string    `json:"excerpt"`
 }
 
 type reactionResponse struct {
@@ -123,10 +130,14 @@ func messageResult(value message.Message) messageResponse {
 	for _, item := range value.Reactions {
 		reactions = append(reactions, reactionResult(item))
 	}
-	return messageResponse{
+	result := messageResponse{
 		ID: value.ID, DialogID: value.DialogID, SenderID: value.SenderID, Body: value.Body,
 		CreatedAt: value.CreatedAt, ReadAt: value.ReadAt, Reactions: reactions,
 	}
+	if value.ReplyTo != nil {
+		result.ReplyTo = &replyResponse{ID: value.ReplyTo.ID, SenderID: value.ReplyTo.SenderID, Excerpt: value.ReplyTo.Excerpt}
+	}
+	return result
 }
 
 func reactionResult(value reaction.Reaction) reactionResponse {
@@ -215,13 +226,22 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request struct {
-		Body string `json:"body"`
+		Body    string  `json:"body"`
+		ReplyTo *string `json:"reply_to_message_id"`
 	}
 	if !decodeJSON(w, r, &request) {
 		return
 	}
 	actorID, _ := session.UserID(r.Context())
-	result, err := s.messaging.Messages.SendMessage(r.Context(), actorID, dialogID, request.Body)
+	var replyToID *uuid.UUID
+	if request.ReplyTo != nil {
+		replyID, ok := requestID(w, "reply_to_message_id", *request.ReplyTo)
+		if !ok {
+			return
+		}
+		replyToID = &replyID
+	}
+	result, err := s.messaging.Messages.SendMessage(r.Context(), actorID, dialogID, request.Body, replyToID)
 	if err != nil {
 		writeError(w, err)
 		return

@@ -33,6 +33,7 @@ type Identity = { id: string; username: string };
 type Dialog = { id: string; unread_count: number; peer: Identity; last_message: { id: string } | null };
 type Message = {
   id: string; body: string; read_at: string | null; reactions: { user_id: string; reaction: string }[];
+  reply_to?: { id: string; sender_id: string; excerpt: string };
 };
 type MessagePage = { messages: Message[]; page_info: { next_page_token: string } };
 
@@ -83,7 +84,7 @@ const signIn = client();
 await json(await signIn("/auth/login", "POST", { username: a.username, password: password.slice(0, -1) + "🔑" }), 401);
 await json(await signIn("/auth/login", "POST", { username: a.username, password }), 200);
 const b = await register(bob, "bob_");
-await register(outsider, "other_");
+const other = await register(outsider, "other_");
 assert.equal((await json<Identity>(await alice("/users/find?username=" + b.username.toUpperCase()), 200)).id, b.id);
 const dialog = await json<Dialog>(await alice("/dialogs", "POST", { other_user_id: b.id }), 200);
 const fromBob = await json<Dialog>(await bob("/dialogs", "POST", { other_user_id: a.id }), 200);
@@ -98,14 +99,28 @@ try {
   assert.equal((await outsider(path + "/messages")).status, 403);
   const first = await json<Message>(await alice(path + "/messages", "POST", { body: "Первое сообщение" }), 201);
   await streamB.has("message.created", "message_id", first.id);
-  const reply = await json<Message>(await bob(path + "/messages", "POST", { body: "Ответ" }), 201);
+  const anotherDialog = await json<Dialog>(await bob("/dialogs", "POST", { other_user_id: other.id }), 200);
+  const wrongDialog = await json(await bob(`/dialogs/${anotherDialog.id}/messages`, "POST", {
+    body: "Чужая цитата", reply_to_message_id: first.id,
+  }), 404);
+  const missingQuote = await json(await bob(path + "/messages", "POST", {
+    body: "Нет оригинала", reply_to_message_id: "10000000-0000-4000-8000-000000000004",
+  }), 404);
+  assert.deepEqual(wrongDialog, missingQuote);
+  assert.equal((await bob(path + "/messages", "POST", { body: "Ответ", reply_to_message_id: "invalid" })).status, 400);
+  assert.equal((await outsider(path + "/messages", "POST", { body: "Чужой чат", reply_to_message_id: first.id })).status, 403);
+  const reply = await json<Message>(await bob(path + "/messages", "POST", { body: "Ответ", reply_to_message_id: first.id }), 201);
+  const expectedQuote = { id: first.id, sender_id: a.id, excerpt: first.body };
+  assert.deepEqual(reply.reply_to, expectedQuote);
   await streamA.has("message.created", "message_id", reply.id);
+  await streamA.has("message.created", "reply_to_message_id", first.id);
   const list = await json<{ dialogs: Dialog[] }>(await bob("/dialogs"), 200);
   assert.equal(list.dialogs[0].last_message?.id, reply.id);
   assert.equal(list.dialogs[0].unread_count, 1);
 
   const page = await json<MessagePage>(await bob(path + "/messages?page_size=1"), 200);
   assert.equal(page.messages[0].id, reply.id);
+  assert.deepEqual(page.messages[0].reply_to, expectedQuote);
   const next = new URLSearchParams({ page_size: "1", page_token: page.page_info.next_page_token });
   const older = await json<MessagePage>(await bob(path + "/messages?" + next), 200);
   assert.equal(older.messages[0].id, first.id);
@@ -138,4 +153,4 @@ try {
 
 assert.equal((await bob("/auth/login", "POST", { username: b.username, password })).status, 200);
 assert.equal((await json<Identity>(await bob("/users/me"), 200)).id, b.id);
-console.log("Passed: sessions, CSRF, user search, dialogue identity, membership, SSE, message history, read receipts, reactions and presence.");
+console.log("Passed: sessions, CSRF, user search, dialogue identity, membership, SSE, message history, quoted replies, read receipts, reactions and presence.");

@@ -1,7 +1,7 @@
 import type { ComponentPropsWithRef } from "react";
 import { statusLabels, type Status } from "../../lib/chat-data";
 
-type IconName = "search" | "back" | "up" | "details" | "close" | "check" | "plus" | "more";
+type IconName = "search" | "back" | "up" | "down" | "reply" | "details" | "close" | "check" | "plus" | "more";
 
 export function Icon({ name }: { name: IconName }) {
   return <span className={`icon icon-${name}`} aria-hidden="true" />;

@@ -193,3 +193,57 @@ input::placeholder, textarea::placeholder { color: var(--muted) }
 @layer components {
   .icon-check.is-read { color: var(--accent); }
 }
+
+@layer components {
+  .draft-label { color: var(--accent); font-weight: 600 }
+  .history-pane { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column }
+  .history-pane .messages { width: 100% }
+  .latest-button {
+    position: absolute;
+    inset: auto var(--thread-inset) 12px auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding-inline: 12px;
+    border: 1px solid var(--control-line);
+    border-radius: 20px;
+    background: var(--panel);
+    color: var(--text);
+  }
+  .latest-button:hover { background: var(--surface) }
+  .icon-down { transform: rotate(-90deg) }
+  .icon-down::before, .icon-reply::before { content: ""; width: 12px; height: 1.5px; inset: 7px auto auto 2px; background: currentColor }
+  .icon-down::after, .icon-reply::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    inset: 4px auto auto 2px;
+    border: solid currentColor;
+    border-width: 0 0 1.5px 1.5px;
+    transform: rotate(45deg);
+  }
+  .message.is-highlighted { outline: 2px solid var(--accent); outline-offset: 3px }
+  .quote {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    width: 100%;
+    gap: 1px;
+    margin-block-end: 6px;
+    padding: 4px 9px;
+    border-inline-start: 2px solid var(--accent);
+    border-radius: 4px;
+    background: var(--panel);
+    text-align: start;
+    font-size: 13px;
+  }
+  button.quote:hover { border-inline-start-width: 4px; padding-inline-start: 7px }
+  .quote strong { color: var(--accent); font-size: 12px; font-weight: 600 }
+  .quote span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .reply-composer { display: flex; align-items: center; gap: 8px; margin-bottom: 6px }
+  .reply-composer .quote { flex: 1; margin: 0 }
+  @supports (field-sizing: content) {
+    .composer textarea { field-sizing: content; resize: none }
+  }
+}

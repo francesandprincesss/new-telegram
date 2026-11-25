@@ -18,6 +18,7 @@ type Payload interface {
 
 type MessageCreated struct {
 	MessageID uuid.UUID
+	ReplyToID *uuid.UUID
 	DialogID  uuid.UUID
 	SenderID  uuid.UUID
 	Body      string

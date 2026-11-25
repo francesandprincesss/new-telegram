@@ -60,18 +60,18 @@ func TestSendDoesNotPublishBeforePersistence(t *testing.T) {
 	service := NewService(repo, dialogAccessStub{participants: [2]uuid.UUID{sender, peer}}, publisher)
 
 	for _, body := range []string{" \t\n", "\x00", "\xff", strings.Repeat("Ж", MaxBodyLength+1)} {
-		_, err := service.SendMessage(ctx, sender, dialogID, body)
+		_, err := service.SendMessage(ctx, sender, dialogID, body, nil)
 		if apperror.CodeOf(err) != apperror.CodeInvalidArgument {
 			t.Fatalf("invalid message error = %v", err)
 		}
 	}
-	if _, err := service.SendMessage(ctx, uuid.New(), dialogID, "hello"); apperror.CodeOf(err) != apperror.CodeForbidden {
+	if _, err := service.SendMessage(ctx, uuid.New(), dialogID, "hello", nil); apperror.CodeOf(err) != apperror.CodeForbidden {
 		t.Fatalf("outside participant error = %v", err)
 	}
 	if repo.calls != 0 {
 		t.Fatalf("rejected messages reached persistence %d times", repo.calls)
 	}
-	if _, err := service.SendMessage(ctx, sender, dialogID, "hello"); !errors.Is(err, persistenceFailure) {
+	if _, err := service.SendMessage(ctx, sender, dialogID, "hello", nil); !errors.Is(err, persistenceFailure) {
 		t.Fatalf("persistence error = %v", err)
 	}
 	if len(publisher.values) != 0 {
@@ -80,7 +80,7 @@ func TestSendDoesNotPublishBeforePersistence(t *testing.T) {
 
 	repo.err = nil
 	body := strings.Repeat("Ж", MaxBodyLength)
-	message, err := service.SendMessage(ctx, sender, dialogID, body)
+	message, err := service.SendMessage(ctx, sender, dialogID, body, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

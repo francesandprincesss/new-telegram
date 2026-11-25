@@ -6,6 +6,7 @@ import {
   mergeMessages,
   reactions,
   validateMessage,
+  type ComposerDraft,
   type Dialog,
   type Message,
   type ReactionKind,
@@ -22,20 +23,24 @@ type ThreadProps = {
   onChange: () => void;
   errorMessage: (error: unknown) => string;
   visibleOnMobile: boolean;
+  draft: ComposerDraft;
+  sending: boolean;
+  updateDraft: (id: string, update: (value: ComposerDraft) => ComposerDraft) => void;
+  trackSend: (id: string, pending: boolean) => void;
 };
 
 export function Thread({
   dialog, userId, revision, details, setDetails, back, onChange, errorMessage, visibleOnMobile,
+  draft, sending, updateDraft, trackSend,
 }: ThreadProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState("");
   const [moreBusy, setMoreBusy] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
   const [actionError, setActionError] = useState("");
   const [openReaction, setOpenReaction] = useState<string>();
   const [updatingReaction, setUpdatingReaction] = useState<string>();
+  const [highlighted, setHighlighted] = useState<string>();
   const [atEnd, setAtEnd] = useState(true);
   const [viewing, setViewing] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -43,10 +48,12 @@ export function Thread({
   const input = useRef<HTMLTextAreaElement>(null);
   const info = useRef<HTMLButtonElement>(null);
   const pages = useRef(1);
+  const followLatest = useRef(true);
   const loadedMessages = useRef<Message[]>([]);
   const latestRead = useRef("");
   const scroll = useRef<{ bottom?: true; height?: number; top?: number } | null>(null);
   const { id, peer } = dialog;
+  const messageIds = new Set(messages.map(message => message.id));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -99,6 +106,16 @@ export function Thread({
   }, [messages, visibleOnMobile]);
 
   useEffect(() => {
+    const list = pane.current;
+    if (!list) return;
+    const observer = new ResizeObserver(() => {
+      if (followLatest.current && list.clientHeight) list.scrollTop = list.scrollHeight;
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     const compact = matchMedia("(max-width: 620px)");
     function update() {
       setViewing(!document.hidden && document.hasFocus() && (!compact.matches || visibleOnMobile));
@@ -147,24 +164,56 @@ export function Thread({
     }
   }
 
+  function replyTo(message: Message) {
+    const excerpt = Array.from(message.body.trim().replace(/\s+/g, " "));
+    updateDraft(id, value => ({
+      ...value,
+      replyTo: {
+        id: message.id, sender_id: message.sender_id,
+        excerpt: excerpt.length > 180 ? excerpt.slice(0, 179).join("") + "…" : excerpt.join(""),
+      },
+    }));
+    input.current?.focus();
+  }
+
+  function clearReply() {
+    updateDraft(id, value => ({ ...value, replyTo: undefined }));
+    input.current?.focus();
+  }
+
+  function jumpTo(id: string) {
+    const original = document.getElementById("message-" + id);
+    original?.focus({ preventScroll: true });
+    original?.scrollIntoView({ block: "center" });
+    setHighlighted(id);
+  }
+
+  function jumpToEnd() {
+    const list = pane.current;
+    if (list) list.scrollTop = list.scrollHeight;
+    followLatest.current = true;
+    setAtEnd(true);
+    list?.focus({ preventScroll: true });
+  }
+
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft.trim() || sending) return;
-    const validation = validateMessage(draft);
+    if (!draft.body.trim() || sending) return;
+    const validation = validateMessage(draft.body);
     setActionError(validation);
     if (validation) return;
-    const body = draft.trim();
-    setSending(true);
+    const body = draft.body.trim();
+    trackSend(id, true);
     try {
-      const message = await api.send(id, body);
+      const message = await api.send(id, body, draft.replyTo?.id);
       scroll.current = { bottom: true };
       setMessages(value => mergeMessages(value, [message]));
-      setDraft(value => value.trim() === body ? "" : value);
+      updateDraft(id, value => value === draft ? { body: "" } : value);
       onChange();
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
-      setSending(false);
+      trackSend(id, false);
       input.current?.focus();
     }
   }
@@ -202,70 +251,102 @@ export function Thread({
           <IconButton ref={info} name="details" label="Сведения о чате" className="info"
             aria-controls="chat-details" aria-expanded={details} onClick={() => setDetails(!details)} />
         </header>
-        <div className="messages" ref={pane} aria-label="Сообщения" role="log" aria-live="polite"
-          onScroll={event => {
-            const list = event.currentTarget;
-            setAtEnd(list.scrollHeight - list.scrollTop - list.clientHeight <= 48);
-          }}>
-          {token && <button type="button" className="quiet-action self-center" disabled={moreBusy} onClick={older}>
-            {moreBusy ? "Загрузка…" : "Предыдущие сообщения"}
-          </button>}
-          {historyError && <div className="self-center text-center">
-            <p className="error-text" role="alert">{historyError}</p>
-            <button type="button" className="quiet-action" onClick={() => setRetry(value => value + 1)}>Повторить</button>
-          </div>}
-          {!messages.length && !historyError && <p className="subtle self-center" role="status">
-            {token === null ? "Загрузка сообщений…" : "Сообщений пока нет"}
-          </p>}
-          {messages.map((message, index) => {
-            const sent = message.sender_id === userId;
-            const day = dayLabel(message.created_at);
-            const showDay = index === 0 || day !== dayLabel(messages[index - 1].created_at);
-            const menuOpen = openReaction === message.id;
+        <div className="history-pane">
+          <div className="messages" ref={pane} tabIndex={-1} aria-label="Сообщения" role="log" aria-live="polite"
+            onScroll={event => {
+              const list = event.currentTarget;
+              followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight <= 48;
+              setAtEnd(followLatest.current);
+            }}>
+            {token && <button type="button" className="quiet-action self-center" disabled={moreBusy} onClick={older}>
+              {moreBusy ? "Загрузка…" : "Предыдущие сообщения"}
+            </button>}
+            {historyError && <div className="self-center text-center">
+              <p className="error-text" role="alert">{historyError}</p>
+              <button type="button" className="quiet-action" onClick={() => setRetry(value => value + 1)}>Повторить</button>
+            </div>}
+            {!messages.length && !historyError && <p className="subtle self-center" role="status">
+              {token === null ? "Загрузка сообщений…" : "Сообщений пока нет"}
+            </p>}
+            {messages.map((message, index) => {
+              const sent = message.sender_id === userId;
+              const day = dayLabel(message.created_at);
+              const showDay = index === 0 || day !== dayLabel(messages[index - 1].created_at);
+              const menuOpen = openReaction === message.id;
+              const quote = message.reply_to;
+              const quoteContent = quote && (
+                <QuoteContent author={quote.sender_id === userId ? "Вы" : peer.username} excerpt={quote.excerpt} />
+              );
 
-            return (
-              <Fragment key={message.id}>
-                {showDay && <div className="day">{day}</div>}
-                <article className={`message ${sent ? "sent" : ""}`} aria-label={sent ? "Вы" : peer.username}>
-                  <p>{message.body}</p>
-                  <div className="message-meta">
-                    <Timestamp value={message.created_at} />
-                    {sent && <span className={`icon icon-check ${message.read_at ? "is-read" : ""}`} role="img"
-                      aria-label={message.read_at ? "Прочитано" : "Отправлено"} title={message.read_at ? "Прочитано" : "Отправлено"} />}
-                    <span className="message-menu">
-                      <IconButton name="more" label="Реакции" aria-expanded={menuOpen}
-                        onClick={() => setOpenReaction(menuOpen ? undefined : message.id)} />
-                    </span>
-                  </div>
-                  {(menuOpen || message.reactions.length > 0) && <div className="reaction-panel" aria-label="Реакции">
-                    {reactions.map(({ kind, icon, label }) => {
-                      const entries = message.reactions.filter(value => value.reaction === kind);
-                      if (!menuOpen && !entries.length) return null;
-                      return <button key={kind} type="button" className="reaction" title={label}
-                        aria-label={entries.length ? `${label} (${entries.length})` : label}
-                        aria-pressed={entries.some(entry => entry.user_id === userId)} disabled={!!updatingReaction}
-                        onClick={() => changeReaction(message, kind)}>
-                        <span aria-hidden="true">{icon}</span>
-                        {entries.length > 0 && <span aria-hidden="true">{entries.length}</span>}
-                      </button>;
-                    })}
-                  </div>}
-                </article>
-              </Fragment>
-            );
-          })}
+              return (
+                <Fragment key={message.id}>
+                  {showDay && <div className="day">{day}</div>}
+                  <article id={"message-" + message.id} tabIndex={-1}
+                    className={`message ${sent ? "sent" : ""} ${highlighted === message.id ? "is-highlighted" : ""}`}
+                    aria-label={sent ? "Вы" : peer.username} onBlur={() => {
+                      if (highlighted === message.id) setHighlighted(undefined);
+                    }}>
+                    {quote && (messageIds.has(quote.id)
+                      ? <button type="button" className="quote" title="Перейти к сообщению" onClick={() => jumpTo(quote.id)}>
+                          {quoteContent}
+                        </button>
+                      : <div className="quote">{quoteContent}</div>)}
+                    <p>{message.body}</p>
+                    <div className="message-meta">
+                      <Timestamp value={message.created_at} />
+                      {sent && <span className={`icon icon-check ${message.read_at ? "is-read" : ""}`} role="img"
+                        aria-label={message.read_at ? "Прочитано" : "Отправлено"} title={message.read_at ? "Прочитано" : "Отправлено"} />}
+                      <span className="message-menu">
+                        <IconButton name="reply" label="Ответить" onClick={() => replyTo(message)} />
+                        <IconButton name="more" label="Реакции" aria-expanded={menuOpen}
+                          onClick={() => setOpenReaction(menuOpen ? undefined : message.id)} />
+                      </span>
+                    </div>
+                    {(menuOpen || message.reactions.length > 0) && <div className="reaction-panel" aria-label="Реакции">
+                      {reactions.map(({ kind, icon, label }) => {
+                        const entries = message.reactions.filter(value => value.reaction === kind);
+                        if (!menuOpen && !entries.length) return null;
+                        return <button key={kind} type="button" className="reaction" title={label}
+                          aria-label={entries.length ? `${label} (${entries.length})` : label}
+                          aria-pressed={entries.some(entry => entry.user_id === userId)} disabled={!!updatingReaction}
+                          onClick={() => changeReaction(message, kind)}>
+                          <span aria-hidden="true">{icon}</span>
+                          {entries.length > 0 && <span aria-hidden="true">{entries.length}</span>}
+                        </button>;
+                      })}
+                    </div>}
+                  </article>
+                </Fragment>
+              );
+            })}
+          </div>
+          {!atEnd && <button type="button" className="latest-button" onClick={jumpToEnd}>
+            <Icon name="down" /> К последним
+          </button>}
         </div>
         <div className="composer-area">
           {actionError && <p className="error-text mb-2" role="alert">{actionError}</p>}
+          {draft.replyTo && <div className="reply-composer">
+            <div className="quote">
+              <QuoteContent author={draft.replyTo.sender_id === userId ? "Ваше сообщение" : peer.username}
+                excerpt={draft.replyTo.excerpt} />
+            </div>
+            <IconButton name="close" label="Отменить ответ" onClick={clearReply} />
+          </div>}
           <form className="composer" onSubmit={send}>
-            <textarea rows={1} ref={input} value={draft} onChange={event => setDraft(event.target.value)}
+            <textarea rows={1} ref={input} value={draft.body} onChange={event => {
+              const body = event.target.value;
+              updateDraft(id, value => ({ ...value, body }));
+            }}
               onKeyDown={event => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === "Escape" && draft.replyTo) clearReply();
+                if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   event.currentTarget.form?.requestSubmit();
                 }
               }} aria-label="Сообщение" placeholder="Сообщение" maxLength={8000} />
-            <button className="send" type="submit" aria-label="Отправить сообщение" disabled={sending || !draft.trim()}>
+            <button className="send" type="submit" aria-label="Отправить сообщение" disabled={sending || !draft.body.trim()}>
               <Icon name="up" />
             </button>
           </form>
@@ -289,4 +370,8 @@ export function Thread({
       </aside>
     </>
   );
+}
+
+function QuoteContent({ author, excerpt }: { author: string; excerpt: string }) {
+  return <><strong>{author}</strong><span>{excerpt}</span></>;
 }

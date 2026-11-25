@@ -24,7 +24,7 @@ func NewService(repository Repository, dialogs DialogAccess, events Publisher) *
 	return &Service{repository: repository, dialogs: dialogs, events: events}
 }
 
-func (s *Service) SendMessage(ctx context.Context, actorID, dialogID uuid.UUID, body string) (Message, error) {
+func (s *Service) SendMessage(ctx context.Context, actorID, dialogID uuid.UUID, body string, replyToID *uuid.UUID) (Message, error) {
 	if !utf8.ValidString(body) || strings.ContainsRune(body, 0) || strings.TrimSpace(body) == "" || utf8.RuneCountInString(body) > MaxBodyLength {
 		return Message{}, apperror.New(apperror.CodeInvalidArgument, "body must have 1–4000 characters and cannot be blank")
 	}
@@ -36,7 +36,7 @@ func (s *Service) SendMessage(ctx context.Context, actorID, dialogID uuid.UUID, 
 		return Message{}, err
 	}
 	result, err := s.repository.CreateAndTouchDialog(ctx, NewMessage{
-		ID: uuid.New(), DialogID: dialogID, SenderID: actorID, Body: body, CreatedAt: time.Now().UTC(),
+		ID: uuid.New(), DialogID: dialogID, SenderID: actorID, Body: body, CreatedAt: time.Now().UTC(), ReplyToID: replyToID,
 	})
 	if err != nil {
 		return Message{}, err
@@ -45,7 +45,7 @@ func (s *Service) SendMessage(ctx context.Context, actorID, dialogID uuid.UUID, 
 		ID: uuid.New(), OccurredAt: result.CreatedAt,
 		Payload: event.MessageCreated{
 			MessageID: result.ID, DialogID: result.DialogID,
-			SenderID: result.SenderID, Body: result.Body, CreatedAt: result.CreatedAt,
+			SenderID: result.SenderID, Body: result.Body, CreatedAt: result.CreatedAt, ReplyToID: replyToID,
 		},
 	})
 	return result, nil

@@ -165,7 +165,7 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 | `GET /api/v1/dialogs` | — | `{dialogs, page_info}` |
 | `POST /api/v1/dialogs` | `{other_user_id}` | Новый или существующий личный диалог |
 | `GET /api/v1/dialogs/{dialog_id}/messages` | — | `{messages, page_info}` |
-| `POST /api/v1/dialogs/{dialog_id}/messages` | `{body}` | Отправленное сообщение |
+| `POST /api/v1/dialogs/{dialog_id}/messages` | `{body, reply_to_message_id?}` | Отправленное сообщение |
 | `POST /api/v1/dialogs/{dialog_id}/read` | `{up_to_message_id}` | `{marked_count, read_at}` |
 | `PUT /api/v1/messages/{message_id}/reaction` | `{reaction}` | Реакция пользователя |
 | `DELETE /api/v1/messages/{message_id}/reaction` | — | `{removed}` |
@@ -174,6 +174,13 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 `page_info.next_page_token` как `page_token`. Размер страницы можно задать
 параметром `page_size`. Текст сообщения ограничен 4000 символами.
 Допустимые реакции: `LIKE`, `LOVE`, `LAUGH`, `WOW`.
+
+Чтобы ответить на сообщение, добавьте `reply_to_message_id` к JSON-запросу
+`POST /api/v1/dialogs/{dialog_id}/messages`. UUID должен принадлежать сообщению
+в том же диалоге. При успешной отправке и чтении истории у ответа есть
+поле `reply_to` с `id`, `sender_id` и текстом превью в `excerpt`. Событие SSE
+`message.created` для ответа также содержит `reply_to_message_id`.
+
 Участники диалога получают события `message.created`, `messages.read` и
 `reaction.changed`. После переподключения клиент запрашивает актуальные данные.
 
@@ -184,7 +191,7 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 | 400 | `InvalidArgument` | Некорректный JSON, UUID, username, пароль или статус |
 | 401 | `Unauthenticated` | Отсутствующий, неверный или просроченный JWT |
 | 403 | `PermissionDenied` | Операция запрещена |
-| 404 | `NotFound` | Пользователь не найден |
+| 404 | `NotFound` | Запись не найдена |
 | 409 | `AlreadyExists` | Username уже занят |
 | 500 | `Internal` | Внутренняя ошибка без деталей БД и секретов |
 

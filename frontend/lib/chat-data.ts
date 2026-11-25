@@ -16,6 +16,10 @@ export interface Reaction {
   updated_at: string;
 }
 
+export type MessageQuote = { id: string; sender_id: string; excerpt: string };
+
+export type ComposerDraft = { body: string; replyTo?: MessageQuote };
+
 export interface Message {
   id: string;
   dialog_id: string;
@@ -24,6 +28,7 @@ export interface Message {
   created_at: string;
   read_at: string | null;
   reactions: Reaction[];
+  reply_to?: MessageQuote;
 }
 
 export interface Dialog {

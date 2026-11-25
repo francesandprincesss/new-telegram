@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
@@ -29,6 +30,7 @@ func (r *GORMRepository) CreateAndTouchDialog(ctx context.Context, input NewMess
 	if err != nil {
 		return Message{}, apperror.Wrap(apperror.CodeInternal, "could not protect message", err)
 	}
+	var reply *ReplyPreview
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Lock the dialog before inserting so concurrent sends share a stable
 		// chronology for pagination and read cutoffs, even within one microsecond.
@@ -44,21 +46,39 @@ func (r *GORMRepository) CreateAndTouchDialog(ctx context.Context, input NewMess
 		if result.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
 		}
+		if input.ReplyToID != nil {
+			var original storedReply
+			err := tx.Table("messages").Select("id, sender_id, body_ciphertext").
+				Where("dialog_id = ? AND id = ?", input.DialogID, *input.ReplyToID).Take(&original).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperror.New(apperror.CodeNotFound, "quoted message not found in this dialog")
+			}
+			if err != nil {
+				return err
+			}
+			reply, err = r.replyPreview(original, input.DialogID)
+			if err != nil {
+				return err
+			}
+		}
 		input.CreatedAt = stamp.UpdatedAt
 		return tx.Table("messages").Create(map[string]any{
 			"id": input.ID, "dialog_id": input.DialogID, "sender_id": input.SenderID,
-			"body_ciphertext": encrypted, "created_at": input.CreatedAt,
+			"body_ciphertext": encrypted, "created_at": input.CreatedAt, "reply_to_id": input.ReplyToID,
 		}).Error
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return Message{}, apperror.New(apperror.CodeNotFound, "dialog not found")
 	}
 	if err != nil {
+		if apperror.CodeOf(err) == apperror.CodeNotFound {
+			return Message{}, err
+		}
 		return Message{}, apperror.Wrap(apperror.CodeInternal, "could not send message", err)
 	}
 	return Message{
 		ID: input.ID, DialogID: input.DialogID, SenderID: input.SenderID,
-		Body: input.Body, CreatedAt: input.CreatedAt,
+		Body: input.Body, CreatedAt: input.CreatedAt, ReplyTo: reply,
 	}, nil
 }
 
@@ -66,15 +86,19 @@ func (r *GORMRepository) ListByDialog(ctx context.Context, dialogID uuid.UUID, c
 	var rows []struct {
 		Message
 		BodyCiphertext []byte
+		Original       storedReply `gorm:"embedded;embeddedPrefix:reply_"`
 	}
-	query := r.db.WithContext(ctx).Table("messages").Select(`id, dialog_id, sender_id, body_ciphertext, created_at,
+	query := r.db.WithContext(ctx).Table("messages").Select(`messages.id, messages.dialog_id, messages.sender_id, messages.body_ciphertext, messages.created_at,
+		original.id AS reply_id, original.sender_id AS reply_sender_id, original.body_ciphertext AS reply_body_ciphertext,
 		(SELECT read_at FROM read_receipts
 		 WHERE message_id = messages.id AND user_id <> messages.sender_id
-		 ORDER BY read_at LIMIT 1) AS read_at`).Where("dialog_id = ?", dialogID)
+		 ORDER BY read_at LIMIT 1) AS read_at`).
+		Joins("LEFT JOIN messages AS original ON original.id = messages.reply_to_id AND original.dialog_id = messages.dialog_id").
+		Where("messages.dialog_id = ?", dialogID)
 	if cursor != nil {
-		query = query.Where("(created_at, id) < (?, ?)", cursor.CreatedAt, cursor.ID)
+		query = query.Where("(messages.created_at, messages.id) < (?, ?)", cursor.CreatedAt, cursor.ID)
 	}
-	if err := query.Order("created_at DESC, id DESC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := query.Order("messages.created_at DESC, messages.id DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, apperror.Wrap(apperror.CodeInternal, "could not load messages", err)
 	}
 	messages := make([]Message, len(rows))
@@ -85,11 +109,36 @@ func (r *GORMRepository) ListByDialog(ctx context.Context, dialogID uuid.UUID, c
 		}
 		messages[i] = row.Message
 		messages[i].Body = body
+		if row.Original.ID != uuid.Nil {
+			messages[i].ReplyTo, err = r.replyPreview(row.Original, row.DialogID)
+			if err != nil {
+				return nil, apperror.Wrap(apperror.CodeInternal, "could not read quoted message", err)
+			}
+		}
 	}
 	if err := r.loadReactions(ctx, messages); err != nil {
 		return nil, err
 	}
 	return messages, nil
+}
+
+type storedReply struct {
+	ID             uuid.UUID
+	SenderID       uuid.UUID
+	BodyCiphertext []byte
+}
+
+func (r *GORMRepository) replyPreview(original storedReply, dialogID uuid.UUID) (*ReplyPreview, error) {
+	body, err := r.cipher.decrypt(original.BodyCiphertext, original.ID, dialogID, original.SenderID)
+	if err != nil {
+		return nil, err
+	}
+	excerpt := strings.Join(strings.Fields(body), " ")
+	const maxExcerpt = 180
+	if characters := []rune(excerpt); len(characters) > maxExcerpt {
+		excerpt = string(characters[:maxExcerpt-1]) + "…"
+	}
+	return &ReplyPreview{ID: original.ID, SenderID: original.SenderID, Excerpt: excerpt}, nil
 }
 
 func (r *GORMRepository) loadReactions(ctx context.Context, messages []Message) error {

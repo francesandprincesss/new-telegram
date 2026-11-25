@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, errorText } from "../../lib/api";
-import { mergeDialogs, statusLabels, type Dialog, type Status, type User } from "../../lib/chat-data";
+import { mergeDialogs, statusLabels, type ComposerDraft, type Dialog, type Status, type User } from "../../lib/chat-data";
 import { AuthForm } from "./auth-form";
 import { Thread } from "./thread";
 import { Avatar, Icon, IconButton, Timestamp } from "./ui";
@@ -44,10 +44,14 @@ export function ChatApp() {
   return <AuthForm onSignIn={user => setSession({ user })} />;
 }
 
+const emptyDraft: ComposerDraft = { body: "" };
+
 function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [moreBusy, setMoreBusy] = useState(false);
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, ComposerDraft>>(() => new Map());
+  const [sending, setSending] = useState<ReadonlySet<string>>(() => new Set());
   const [activeId, setActiveId] = useState<string>();
   const [query, setQuery] = useState("");
   const [threadOpen, setThreadOpen] = useState(false);
@@ -63,6 +67,27 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
   const refresh = useCallback(() => setRevision(value => value + 1), []);
   const connected = useEvents(refresh, onExpired);
   const active = dialogs.find(dialog => dialog.id === activeId);
+
+  function updateDraft(id: string, update: (draft: ComposerDraft) => ComposerDraft) {
+    setDrafts(current => {
+      const previous = current.get(id) ?? emptyDraft;
+      const next = update(previous);
+      if (previous === next) return current;
+      const updated = new Map(current);
+      if (next.body || next.replyTo) updated.set(id, next);
+      else updated.delete(id);
+      return updated;
+    });
+  }
+
+  function trackSend(id: string, pending: boolean) {
+    setSending(current => {
+      const next = new Set(current);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
   const errorMessage = useCallback((error: unknown) => {
     if (error instanceof ApiError && error.status === 401) onExpired();
@@ -183,24 +208,29 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
           </label>
         </div>
         <div className="chat-list">
-          {visible.map(dialog => (
-            <button key={dialog.id} type="button" className="chat" aria-current={active?.id === dialog.id}
-              onClick={() => openDialog(dialog.id)}>
-              <Avatar username={dialog.peer.username} />
-              <span>
-                <span className="chat-top">
-                  <span className="chat-name">{dialog.peer.username}</span>
-                  {dialog.last_message && <Timestamp value={dialog.last_message.created_at} compact />}
+          {visible.map(dialog => {
+            const draft = drafts.get(dialog.id)?.body.trim();
+            return (
+              <button key={dialog.id} type="button" className="chat" aria-current={active?.id === dialog.id}
+                onClick={() => openDialog(dialog.id)}>
+                <Avatar username={dialog.peer.username} />
+                <span>
+                  <span className="chat-top">
+                    <span className="chat-name">{dialog.peer.username}</span>
+                    {dialog.last_message && <Timestamp value={dialog.last_message.created_at} compact />}
+                  </span>
+                  <span className="chat-bottom">
+                    <span className="chat-preview">{draft
+                      ? <><strong className="draft-label">Черновик</strong> {draft}</>
+                      : dialog.last_message
+                        ? (dialog.last_message.sender_id === user.id ? "Вы: " : "") + dialog.last_message.body
+                        : "Сообщений пока нет"}</span>
+                    {dialog.unread_count > 0 && <span className="badge" aria-label={`Непрочитанных: ${dialog.unread_count}`}>{dialog.unread_count}</span>}
+                  </span>
                 </span>
-                <span className="chat-bottom">
-                  <span className="chat-preview">{dialog.last_message
-                    ? (dialog.last_message.sender_id === user.id ? "Вы: " : "") + dialog.last_message.body
-                    : "Сообщений пока нет"}</span>
-                  {dialog.unread_count > 0 && <span className="badge" aria-label={`Непрочитанных: ${dialog.unread_count}`}>{dialog.unread_count}</span>}
-                </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            );
+          })}
           {!visible.length && !listError && <p className="empty subtle" role="status">
             {token === null ? "Загрузка чатов…" : query.trim() ? "Чаты не найдены" : "Чатов пока нет"}
           </p>}
@@ -231,7 +261,8 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
       {active
         ? <Thread key={active.id} dialog={active} userId={user.id} revision={revision} details={details}
             setDetails={setDetails} back={back} onChange={refresh} errorMessage={errorMessage}
-            visibleOnMobile={threadOpen} />
+            visibleOnMobile={threadOpen} draft={drafts.get(active.id) ?? emptyDraft}
+            sending={sending.has(active.id)} updateDraft={updateDraft} trackSend={trackSend} />
         : <section className="conversation" aria-label="Переписка">
           <div className="empty-thread">
             <p className="subtle">{dialogs.length ? "Выберите чат" : "Начните новый чат"}</p>

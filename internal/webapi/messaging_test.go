@@ -39,7 +39,7 @@ func (s messagingStub) ListDialogs(_ context.Context, actor uuid.UUID, size int,
 	return []chat.Dialog{s.dialog}, "dial-next", nil
 }
 
-func (s messagingStub) SendMessage(_ context.Context, actor, dialog uuid.UUID, body string) (message.Message, error) {
+func (s messagingStub) SendMessage(_ context.Context, actor, dialog uuid.UUID, body string, _ *uuid.UUID) (message.Message, error) {
 	if actor != s.actorID || dialog != s.dialog.ID {
 		return message.Message{}, apperror.New(apperror.CodeForbidden, "not a participant")
 	}

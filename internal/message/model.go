@@ -15,9 +15,17 @@ type Message struct {
 	CreatedAt time.Time
 	ReadAt    *time.Time          `gorm:"->"`
 	Reactions []reaction.Reaction `gorm:"-"`
+	ReplyTo   *ReplyPreview       `gorm:"-"`
+}
+
+type ReplyPreview struct {
+	ID       uuid.UUID
+	SenderID uuid.UUID
+	Excerpt  string
 }
 
 type NewMessage struct {
+	ReplyToID *uuid.UUID
 	ID        uuid.UUID
 	DialogID  uuid.UUID
 	SenderID  uuid.UUID
