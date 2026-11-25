@@ -11,9 +11,11 @@ import (
 
 	chatv1 "github.com/francesandprincesss/new-telegram/gen/chat/v1"
 	"github.com/francesandprincesss/new-telegram/internal/auth"
+	"github.com/francesandprincesss/new-telegram/internal/chat"
 	"github.com/francesandprincesss/new-telegram/internal/config"
 	"github.com/francesandprincesss/new-telegram/internal/database"
 	"github.com/francesandprincesss/new-telegram/internal/event"
+	"github.com/francesandprincesss/new-telegram/internal/message"
 	"github.com/francesandprincesss/new-telegram/internal/presence"
 	"github.com/francesandprincesss/new-telegram/internal/user"
 	"google.golang.org/grpc"
@@ -44,6 +46,10 @@ func run() error {
 	presenceManager := presence.NewManager(presenceRepository, presence.NewPeerRepository(db), hub)
 	presenceService := presence.NewService(presenceManager)
 	userService := user.NewService(user.NewRepository(db), presenceManager)
+	chatRepo := chat.NewRepo(db)
+	chatService := chat.NewService(chatRepo, userService)
+	messageRepo := message.NewRepo(db)
+	messageService := message.NewService(messageRepo, chatService, hub)
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.TTL)
 	authService := auth.NewService(auth.NewRepository(db), auth.NewBcryptHasher(0), jwtManager)
 	authInterceptor := auth.NewInterceptor(jwtManager)
@@ -53,6 +59,8 @@ func run() error {
 	chatv1.RegisterUserServiceServer(server, user.NewHandler(userService))
 	chatv1.RegisterPresenceServiceServer(server, presence.NewHandler(presenceService))
 	chatv1.RegisterEventServiceServer(server, event.NewHandler(hub, presenceManager))
+	chatv1.RegisterChatServiceServer(server, chat.NewHandler(chatService))
+	chatv1.RegisterMessageServiceServer(server, message.NewHandler(messageService))
 
 	listener, err := net.Listen("tcp", cfg.GRPCAddress)
 	if err != nil {
