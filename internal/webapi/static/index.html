@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Интерактивная документация gRPC Chat API">
+  <title>Telegram API Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#overview" aria-label="Telegram API Console">
+      <span class="brand-mark">T</span>
+      <span><strong>Telegram</strong><small>API Console</small></span>
+    </a>
+    <div class="environment">
+      <span class="pulse"></span>
+      <span>HTTP <code id="http-address"></code></span>
+      <span>gRPC <code>:50051</code></span>
+    </div>
+    <div class="auth-state">
+      <span id="auth-label">Без авторизации</span>
+      <button class="button ghost" id="logout" hidden>Выйти</button>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <nav aria-label="Документация API">
+      <a href="#overview" class="active">Обзор</a>
+      <span>Auth</span>
+      <a href="#register">Register</a>
+      <a href="#login">Login</a>
+      <span>Users</span>
+      <a href="#get-me">GetMe</a>
+      <a href="#get-user">GetUser</a>
+      <a href="#find-user">FindUser</a>
+      <span>Presence</span>
+      <a href="#set-status">SetStatus</a>
+      <span>Events</span>
+      <a href="#events">SubscribeEvents</a>
+      <span>Справка</span>
+      <a href="#errors">Ошибки</a>
+      <a href="/openapi.json" target="_blank" rel="noreferrer">OpenAPI JSON ↗</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section class="hero" id="overview">
+      <div>
+        <p class="eyebrow">DEVELOPER TOOLING / V1</p>
+        <h1>Проверяй API<br><em>без лишней магии.</em></h1>
+        <p class="lead">Живая документация для gRPC Chat. Запросы из форм ниже идут в тот же доменный слой, что и gRPC, через локальный JSON/SSE facade.</p>
+      </div>
+      <div class="quickstart">
+        <div class="quick-head"><span>Быстрый старт</span><span class="step">01—03</span></div>
+        <ol>
+          <li><span>01</span><div><b>Register или Login</b><small>JWT сохранится в sessionStorage</small></div></li>
+          <li><span>02</span><div><b>Вызови защищённый RPC</b><small>Bearer добавится автоматически</small></div></li>
+          <li><span>03</span><div><b>Открой Event Console</b><small>Проверь ONLINE / OFFLINE в реальном времени</small></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="notice">
+      <b>Транспорт</b>
+      <p>Канонический API — gRPC на <code>:50051</code>. Этот интерфейс использует HTTP на <code>:8080</code> только как удобный адаптер для браузера и ручного тестирования.</p>
+    </section>
+
+    <section class="group">
+      <div class="group-title"><span>01</span><div><p>AUTH SERVICE</p><h2>Регистрация и вход</h2></div></div>
+
+      <article class="endpoint" id="register" data-endpoint="register">
+        <header><span class="method post">POST</span><code>/api/v1/auth/register</code><span class="rpc">AuthService.Register</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Создать пользователя</h3><p>Username уникален без учёта регистра. Допустимы латинские буквы, цифры и <code>_</code>, длина 3–32. Пароль — 8–72 байта.</p></div>
+          <form class="try-form">
+            <label>username<input name="username" value="alice_demo" autocomplete="username"></label>
+            <label>password<input name="password" type="password" value="password123" autocomplete="new-password"></label>
+            <button class="button primary" type="submit">Выполнить запрос</button>
+          </form>
+          <div class="response" aria-live="polite"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+
+      <article class="endpoint" id="login" data-endpoint="login">
+        <header><span class="method post">POST</span><code>/api/v1/auth/login</code><span class="rpc">AuthService.Login</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Получить JWT</h3><p>Возвращает access token. Неверный username и пароль дают одинаковый ответ, чтобы не раскрывать наличие аккаунта.</p></div>
+          <form class="try-form">
+            <label>username<input name="username" value="alice_demo" autocomplete="username"></label>
+            <label>password<input name="password" type="password" value="password123" autocomplete="current-password"></label>
+            <button class="button primary" type="submit">Войти и сохранить JWT</button>
+          </form>
+          <div class="response"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="group">
+      <div class="group-title"><span>02</span><div><p>USER SERVICE · JWT</p><h2>Профили и поиск</h2></div></div>
+
+      <article class="endpoint" id="get-me" data-endpoint="getMe">
+        <header><span class="method get">GET</span><code>/api/v1/users/me</code><span class="lock">JWT</span><span class="rpc">UserService.GetMe</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Текущий профиль</h3><p>User ID берётся только из проверенного JWT. Эффективный статус учитывает активный Event stream.</p></div>
+          <form class="try-form compact"><button class="button primary" type="submit">Получить мой профиль</button></form>
+          <div class="response"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+
+      <article class="endpoint" id="get-user" data-endpoint="getUser">
+        <header><span class="method get">GET</span><code>/api/v1/users/{user_id}</code><span class="lock">JWT</span><span class="rpc">UserService.GetUser</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Профиль по UUID</h3><p>Возвращает публичные поля пользователя и его текущий effective presence.</p></div>
+          <form class="try-form"><label>user_id<input name="user_id" placeholder="00000000-0000-0000-0000-000000000000"></label><button class="button primary" type="submit">Найти по UUID</button></form>
+          <div class="response"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+
+      <article class="endpoint" id="find-user" data-endpoint="findUser">
+        <header><span class="method get">GET</span><code>/api/v1/users/find?username=</code><span class="lock">JWT</span><span class="rpc">UserService.FindUser</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Точный поиск username</h3><p>Поиск регистронезависимый: <code>Alice</code> и <code>alice</code> найдут одну запись.</p></div>
+          <form class="try-form"><label>username<input name="username" value="alice_demo"></label><button class="button primary" type="submit">Найти пользователя</button></form>
+          <div class="response"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="group">
+      <div class="group-title"><span>03</span><div><p>PRESENCE SERVICE · JWT</p><h2>Статус пользователя</h2></div></div>
+      <article class="endpoint" id="set-status" data-endpoint="setStatus">
+        <header><span class="method put">PUT</span><code>/api/v1/presence/status</code><span class="lock">JWT</span><span class="rpc">PresenceService.SetStatus</span></header>
+        <div class="endpoint-body">
+          <div class="endpoint-doc"><h3>Изменить ручной статус</h3><p>Разрешены <code>ONLINE</code>, <code>IDLE</code>, <code>DND</code>. <code>OFFLINE</code> вычисляется сервером, когда нет активных подписок на события.</p></div>
+          <form class="try-form"><label>status<select name="status"><option>ONLINE</option><option>IDLE</option><option>DND</option></select></label><button class="button primary" type="submit">Установить статус</button></form>
+          <div class="response"><div class="response-meta">Ответ появится здесь</div><pre>{}</pre></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="group">
+      <div class="group-title"><span>04</span><div><p>EVENT SERVICE · JWT</p><h2>Живые события</h2></div></div>
+      <article class="event-console" id="events">
+        <div class="console-head"><div><h3>SubscribeEvents</h3><p><code>GET /api/v1/events</code> · Server-Sent Events facade</p></div><div><button class="button primary" id="connect-events">Подключиться</button><button class="button ghost" id="clear-events">Очистить</button></div></div>
+        <div class="console-status"><span class="dot"></span><span id="event-status">Отключено</span></div>
+        <div id="event-log" class="event-log"><div class="empty">События появятся после подключения. Открытый stream автоматически переводит пользователя из OFFLINE в выбранный статус.</div></div>
+      </article>
+    </section>
+
+    <section class="errors" id="errors">
+      <div><p class="eyebrow">ERROR MODEL</p><h2>Коды ошибок</h2><p>HTTP facade сохраняет смысл gRPC-кодов. Внутренние детали базы и секреты никогда не попадают в ответ.</p></div>
+      <table><thead><tr><th>HTTP</th><th>gRPC</th><th>Когда</th></tr></thead><tbody>
+        <tr><td>400</td><td>InvalidArgument</td><td>Некорректный JSON, UUID, username или статус</td></tr>
+        <tr><td>401</td><td>Unauthenticated</td><td>Нет JWT, токен просрочен или неверен</td></tr>
+        <tr><td>404</td><td>NotFound</td><td>Пользователь не найден</td></tr>
+        <tr><td>409</td><td>AlreadyExists</td><td>Username уже занят</td></tr>
+        <tr><td>500</td><td>Internal</td><td>Непредвиденная серверная ошибка</td></tr>
+      </tbody></table>
+    </section>
+  </main>
+
+  <footer><span>gRPC Chat / API v1</span><span>Документ генерируется вместе с сервером</span></footer>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -8,8 +8,11 @@ import (
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
 	"github.com/francesandprincesss/new-telegram/internal/event"
+	"github.com/francesandprincesss/new-telegram/internal/pagination"
 	"github.com/google/uuid"
 )
+
+const MaxBodyLength = 4000
 
 type Service struct {
 	repository Repository
@@ -19,6 +22,78 @@ type Service struct {
 
 func NewService(repository Repository, dialogs DialogAccess, events Publisher) *Service {
 	return &Service{repository: repository, dialogs: dialogs, events: events}
+}
+
+func (s *Service) SendMessage(ctx context.Context, actorID, dialogID uuid.UUID, body string) (Message, error) {
+	if !utf8.ValidString(body) || strings.ContainsRune(body, 0) || strings.TrimSpace(body) == "" || utf8.RuneCountInString(body) > MaxBodyLength {
+		return Message{}, apperror.New(apperror.CodeInvalidArgument, "body must have 1–4000 characters and cannot be blank")
+	}
+	if err := s.dialogs.EnsureParticipant(ctx, dialogID, actorID); err != nil {
+		return Message{}, err
+	}
+	participants, err := s.dialogs.Participants(ctx, dialogID)
+	if err != nil {
+		return Message{}, err
+	}
+	result, err := s.repository.CreateAndTouchDialog(ctx, NewMessage{
+		ID: uuid.New(), DialogID: dialogID, SenderID: actorID, Body: body, CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		return Message{}, err
+	}
+	s.events.PublishTo(participants[:], event.Event{
+		ID: uuid.New(), OccurredAt: result.CreatedAt,
+		Payload: event.MessageCreated{
+			MessageID: result.ID, DialogID: result.DialogID,
+			SenderID: result.SenderID, Body: result.Body, CreatedAt: result.CreatedAt,
+		},
+	})
+	return result, nil
+}
+
+func (s *Service) ListMessages(ctx context.Context, actorID, dialogID uuid.UUID, pageSize int, pageToken string) ([]Message, string, error) {
+	size, err := pagination.Size(pageSize)
+	if err != nil {
+		return nil, "", err
+	}
+	var cursor *Cursor
+	if pageToken != "" {
+		timestamp, id, err := pagination.Decode(pageToken)
+		if err != nil {
+			return nil, "", err
+		}
+		cursor = &Cursor{CreatedAt: timestamp, ID: id}
+	}
+	if err := s.dialogs.EnsureParticipant(ctx, dialogID, actorID); err != nil {
+		return nil, "", err
+	}
+	messages, err := s.repository.ListByDialog(ctx, dialogID, cursor, size+1)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(messages) <= size {
+		return messages, "", nil
+	}
+	last := messages[size-1]
+	return messages[:size], pagination.Encode(last.CreatedAt, last.ID), nil
+}
+
+func (s *Service) DialogSummary(ctx context.Context, actorID, dialogID uuid.UUID) (*Message, int64, error) {
+	if err := s.dialogs.EnsureParticipant(ctx, dialogID, actorID); err != nil {
+		return nil, 0, err
+	}
+	messages, err := s.repository.ListByDialog(ctx, dialogID, nil, 1)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(messages) == 0 {
+		return nil, 0, nil
+	}
+	count, err := s.repository.CountUnread(ctx, dialogID, actorID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return &messages[0], count, nil
 }
 
 // EnsureMessageParticipant exposes only neutral UUID values so receipt and
@@ -40,79 +115,4 @@ func (s *Service) EnsureMessageParticipant(
 		return uuid.Nil, uuid.Nil, participants, err
 	}
 	return message.DialogID, message.SenderID, participants, nil
-}
-
-func (s *Service) SendMessage(ctx context.Context, dialogID, sendlerID uuid.UUID, body string) (Message, error) {
-	if dialogID == uuid.Nil || sendlerID == uuid.Nil {
-		return Message{}, apperror.New(apperror.CodeInvalidArgument, "invalid dialog or sendler")
-	}
-
-	if utf8.RuneCountInString(body) > 4000 || strings.TrimSpace(body) == "" {
-		return Message{}, apperror.New(apperror.CodeInvalidArgument, "invalid message body")
-	}
-
-	if err := s.dialogs.EnsureParticipant(ctx, dialogID, sendlerID); err != nil {
-		return Message{}, err
-	}
-
-	msg := NewMessage{
-		ID: uuid.New(),
-		DialogID: dialogID,
-		SenderID: sendlerID,
-		Body: body,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	msgData, err := s.dialogs.Participants(ctx, msg.DialogID); if err != nil {
-		return Message{}, apperror.Wrap(apperror.CodeInternal, "cannot have participant dialog", err)
-	}
-
-	newMsg, err := s.repository.CreateAndTouchDialog(ctx, msg); if err != nil {
-		return Message{}, apperror.Wrap(apperror.CodeInternal, "invalid create message", err)
-	}
-
-	evt := event.Event{
-		ID: uuid.New(),
-		OccurredAt: time.Now().UTC(),
-		Payload: event.MessageCreated{
-			MessageID: newMsg.ID,
-			DialogID: newMsg.DialogID,
-			SenderID: newMsg.SenderID,
-			Body: newMsg.Body,
-			CreatedAt: newMsg.CreatedAt,
-		},
-	}
-
-	reciverID := msgData[0]
-	if reciverID == sendlerID {
-		reciverID = msgData[1]
-	}
-
-	s.events.PublishTo([]uuid.UUID{reciverID}, evt)
-
-	return newMsg, nil
-}
-
-func (s *Service) ListMessages(ctx context.Context, userID, dialogID uuid.UUID, cursor *Cursor, limit int) ([]Message, error) {
-	if userID == uuid.Nil || dialogID == uuid.Nil {
-		return nil, apperror.New(apperror.CodeInvalidArgument, "invalid userId or dialogID")
-	}
-
-	if limit == 0 {
-		limit = 15
-	}
-
-	if limit < 1 || limit > 15 {
-		return nil, apperror.New(apperror.CodeInvalidArgument, "invalid limit message")
-	}
-
-	if err := s.dialogs.EnsureParticipant(ctx, dialogID, userID); err != nil {
-		return nil, err
-	}
-
-	messages, err := s.repository.ListByDialog(ctx, dialogID, cursor, limit+1); if err != nil {
-		return nil, apperror.Wrap(apperror.CodeInternal, "invalid get messages", err)
-	}
-
-	return messages, nil
 }

@@ -3,15 +3,18 @@ package message
 import (
 	"time"
 
+	"github.com/francesandprincesss/new-telegram/internal/reaction"
 	"github.com/google/uuid"
 )
 
 type Message struct {
-	ID        uuid.UUID `gorm:"primaryKey"`
+	ID        uuid.UUID
 	DialogID  uuid.UUID
 	SenderID  uuid.UUID
 	Body      string
 	CreatedAt time.Time
+	ReadAt    *time.Time          `gorm:"->"`
+	Reactions []reaction.Reaction `gorm:"-"`
 }
 
 type NewMessage struct {

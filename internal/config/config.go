@@ -12,6 +12,7 @@ import (
 // environment variables and must never be committed to the repository.
 type Config struct {
 	GRPCAddress string
+	HTTPAddress string
 	DatabaseURL string
 	JWT         JWTConfig
 }
@@ -29,11 +30,15 @@ func Load() (Config, error) {
 	}
 	cfg := Config{
 		GRPCAddress: strings.TrimSpace(os.Getenv("GRPC_ADDRESS")),
+		HTTPAddress: strings.TrimSpace(os.Getenv("HTTP_ADDRESS")),
 		DatabaseURL: strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		JWT:         JWTConfig{Secret: []byte(os.Getenv("JWT_SECRET")), Issuer: strings.TrimSpace(os.Getenv("JWT_ISSUER")), TTL: ttl},
 	}
 	if cfg.GRPCAddress == "" {
 		return Config{}, fmt.Errorf("GRPC_ADDRESS is required")
+	}
+	if cfg.HTTPAddress == "" {
+		return Config{}, fmt.Errorf("HTTP_ADDRESS is required")
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

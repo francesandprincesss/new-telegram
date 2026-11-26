@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Чаты</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1e1e2e;
+  --panel: #181825;
+  --surface: #313244;
+  --sent-surface: #3b3451;
+  --line: #cdd6f41a;
+  --control-line: #585b70;
+  --header-height: 64px;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --accent: #cba6f7;
+  --caret: #f2cdcd;
+  --green: #a6e3a1;
+
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+* { box-sizing: border-box }
+body { margin: 0; color: var(--text); background: var(--bg); font: 14px/20px system-ui, sans-serif }
+button, input { font: inherit }
+button { color: inherit; cursor: pointer; border: 0; background: none }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+[hidden] { display: none !important }
+.mono, time, .badge { font: 12px/16px var(--mono); font-variant-numeric: tabular-nums }
+.status-dot { display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: 50%; background: var(--green) }
+.workspace {
+  --sidebar-width: clamp(248px, 23vw, 320px);
+  --details-width: clamp(208px, 19vw, 280px);
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--details-width);
+  height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--panel);
+  overflow: hidden;
+}
+.workspace.details-hidden { grid-template-columns: var(--sidebar-width) minmax(0, 1fr) }
+.sidebar, .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0 }
+.sidebar { border-right: 1px solid var(--line) }
+.sidebar-head { padding: 0 16px 12px }
+h1, h2, p { margin: 0 }
+h1 { display: flex; align-items: center; height: var(--header-height); font-size: 24px; font-weight: 500 }
+.search { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px; background: var(--bg); border: 1px solid var(--control-line); border-radius: 8px; color: var(--muted) }
+.icon { position: relative; display: inline-block; flex: none; width: 16px; height: 16px }
+.icon::before, .icon::after { position: absolute }
+.icon-search::before { content: ""; inset: 1px 4px 4px 1px; border: 1.5px solid currentColor; border-radius: 50% }
+.icon-search::after { content: ""; width: 6px; height: 1.5px; inset: 12px auto auto 9px; background: currentColor; transform: rotate(45deg) }
+.icon-back::before, .icon-up::before { content: ""; width: 12px; height: 1.5px; inset: 7px auto auto 2px; background: currentColor }
+.icon-back::after, .icon-up::after { content: ""; width: 7px; height: 7px; inset: 4px auto auto 2px; border: solid currentColor; border-width: 0 0 1.5px 1.5px; transform: rotate(45deg) }
+.icon-up { transform: rotate(90deg) }
+.icon-details { border: 1.5px solid currentColor; border-radius: 3px }
+.icon-details::before { content: ""; inset: 0 4px 0 auto; border-inline-start: 1.5px solid currentColor }
+.icon-close::before, .icon-close::after { content: ""; width: 12px; height: 1.5px; inset: 7px auto auto 2px; background: currentColor; transform: rotate(45deg) }
+.icon-close::after { transform: rotate(-45deg) }
+.icon-check::before { content: ""; width: 9px; height: 5px; inset: 4px auto auto 3px; border: solid currentColor; border-width: 0 0 1.5px 1.5px; transform: rotate(-45deg) }
+.search input { width: 100%; min-width: 0; padding: 0; color: var(--text); border: 0; background: transparent; outline: none }
+.search:focus-within { border-color: var(--accent) }
+kbd { color: var(--muted); border: 1px solid var(--line); border-radius: 4px; font: 12px/16px var(--mono); padding: 0 4px }
+.chat-list { display: grid; gap: 4px; align-content: start; padding: 4px 8px; flex: 1; overflow: auto }
+.chat { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; min-height: 64px; text-align: start; align-items: center; padding: 8px 12px; border: 1px solid transparent; border-radius: 8px }
+.chat:hover, .chat[aria-current="true"] { background: var(--surface) }
+.chat[aria-current="true"] { border-color: var(--line) }
+.chat[aria-current="true"] .chat-name { color: var(--accent) }
+.avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--bg); font: 500 12px/16px var(--mono) }
+.chat-top, .chat-bottom { display: flex; align-items: center; gap: 8px; justify-content: space-between }
+.chat-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.chat-preview, .subtle { color: var(--muted); font-size: 13px }
+.chat-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+time { flex: none; color: var(--muted) }
+.badge { flex: none; color: var(--accent) }
+.empty { margin: 12px }
+.self { min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line) }
+.self strong { font-weight: 500 }
+.self .subtle { display: block; font: 12px/16px var(--mono) }
+.conversation { position: relative; background: var(--bg); --thread-inset: max(24px, calc((100% - 720px) / 2)) }
+.thread-head { display: flex; align-items: center; gap: 12px; padding: 8px 24px; min-height: var(--header-height); border-bottom: 1px solid var(--line); background: var(--panel) }
+.thread-head h2 { font-size: 16px; font-weight: 500 }
+.thread-head .subtle { display: block }
+.thread-head .info { margin-left: auto }
+.icon-button { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 8px; color: var(--muted) }
+.icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--surface); color: var(--text) }
+.back { display: none }
+.messages { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: auto; padding: 24px var(--thread-inset); gap: 20px; overscroll-behavior: contain }
+.day { display: flex; align-items: center; gap: 12px; margin: auto 0 4px; color: var(--muted); font: 12px/16px var(--mono); white-space: nowrap }
+.day::before, .day::after { content: ""; flex: 1; height: 1px; background: var(--line) }
+.message {
+  align-self: flex-start;
+  max-width: min(88%, 540px);
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.message.sent { align-self: flex-end; background: var(--sent-surface) }
+.message p { font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere }
+.message-meta { display: flex; align-items: center; gap: 4px; margin-top: 4px }
+.sent .message-meta { justify-content: flex-end }
+.icon-check { color: var(--muted) }
+.composer-area { padding: 12px var(--thread-inset) 16px; border-top: 1px solid var(--line) }
+.composer { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--panel) }
+.composer:focus-within { border-color: var(--accent) }
+.composer input { min-width: 0; flex: 1; color: var(--text); caret-color: var(--caret); border: 0; background: none; outline: none }
+input::placeholder { color: var(--muted) }
+.send { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 4px; color: var(--panel); background: var(--accent) }
+.send:hover { background: var(--caret) }
+.details { overflow: auto; border-left: 1px solid var(--line); padding: 0 20px 20px }
+.details-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--header-height); color: var(--muted) }
+.profile { display: grid; justify-items: center; text-align: center; padding: 16px 0 24px; border-bottom: 1px solid var(--line) }
+.profile .avatar { width: 64px; height: 64px; border-radius: 12px; font-size: 24px; margin-bottom: 12px }
+.profile h2 { font-size: 16px; font-weight: 500 }
+.profile .mono { color: var(--muted); margin-top: 4px }
+.profile-meta { margin: 0; padding: 20px 0 0 }
+.profile-meta div + div { margin-top: 16px }
+.profile-meta dt { margin-bottom: 4px; color: var(--muted); font-size: 12px }
+.profile-meta dd { margin: 0; font-size: 13px }
+@media (max-width: 850px) {
+  .workspace { position: relative }
+  .workspace, .workspace.details-hidden { grid-template-columns: 232px minmax(0, 1fr) }
+  .details {
+    position: absolute;
+    inset: calc(var(--header-height) + env(safe-area-inset-top)) env(safe-area-inset-right) env(safe-area-inset-bottom) auto;
+    width: min(100%, 248px);
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
+}
+@media (max-width: 620px) {
+  .workspace, .workspace.details-hidden { grid-template-columns: minmax(0, 1fr) }
+  .sidebar { border: 0 }
+  .workspace:not(.list-open) .sidebar, .workspace.list-open .conversation { display: none }
+  .conversation { --thread-inset: 16px }
+  .thread-head { padding-inline: 8px; gap: 8px }
+  .back { display: grid }
+  .search input, .composer input { font-size: 16px }
+  .icon-button, .send { width: 44px; height: 44px }
+  .messages { padding-block: 16px; gap: 16px }
+  .day { margin-bottom: 4px }
+}
+</style>
+</head>
+<body>
+  <main class="workspace" id="workspace">
+    <aside class="sidebar" aria-label="Список чатов">
+      <div class="sidebar-head">
+        <h1>Чаты</h1>
+        <label class="search">
+          <span class="icon icon-search" aria-hidden="true"></span>
+          <input id="search" type="search" placeholder="Поиск по чатам" aria-label="Поиск по чатам">
+          <kbd aria-hidden="true">/</kbd>
+        </label>
+      </div>
+      <div class="chat-list" id="chat-list"></div>
+      <div class="self">
+        <div class="avatar" aria-hidden="true">ИВ</div>
+        <div><strong>Иван</strong><span class="subtle">@ivan</span></div>
+      </div>
+    </aside>
+    <section class="conversation" aria-label="Переписка">
+      <header class="thread-head">
+        <button class="icon-button back" type="button" aria-label="К списку чатов"><span class="icon icon-back" aria-hidden="true"></span></button>
+        <span class="avatar" id="thread-avatar" aria-hidden="true"></span>
+        <div><h2 id="thread-name"></h2><span class="subtle" id="thread-status"></span></div>
+        <button class="icon-button info" type="button" aria-label="Сведения о чате" aria-controls="details" aria-expanded="true"><span class="icon icon-details" aria-hidden="true"></span></button>
+      </header>
+      <div class="messages" id="messages" role="log" aria-label="Сообщения"></div>
+      <div class="composer-area">
+        <form class="composer" id="composer">
+          <input id="draft" placeholder="Сообщение" aria-label="Сообщение" maxlength="2000" autocomplete="off">
+          <button class="send" type="submit" aria-label="Отправить сообщение"><span class="icon icon-up" aria-hidden="true"></span></button>
+        </form>
+      </div>
+    </section>
+    <aside class="details" id="details" aria-label="Сведения о чате">
+      <div class="details-head mono">Сведения о чате<button class="icon-button close-details" type="button" aria-label="Закрыть сведения"><span class="icon icon-close" aria-hidden="true"></span></button></div>
+      <div class="profile">
+        <span class="avatar" id="profile-avatar" aria-hidden="true"></span>
+        <h2 id="profile-name"></h2>
+        <span class="mono" id="profile-handle"></span>
+      </div>
+      <dl class="profile-meta">
+        <div><dt>Статус</dt><dd id="profile-status"></dd></div>
+      </dl>
+    </aside>
+  </main>
+<script>
+const chats = [
+  {
+    name: 'Аня Соколова', handle: '@anya', initials: 'АС', online: true,
+    messages: [
+      { text: 'Привет, успеешь сегодня посмотреть макет?', time: '14:12' },
+      { text: 'Да, освобожусь примерно к трём.', time: '14:14', sent: true },
+      { text: 'Отлично. Я поправила отступы в списке чатов и добавила состояние для непрочитанных.', time: '14:16' },
+      { text: 'Посмотрю и оставлю комментарии. Давай потом сверим мобильную версию.', time: '14:21', sent: true },
+      { text: 'Договорились, буду на связи', time: '14:24' }
+    ]
+  },
+  { name: 'Максим Волков', handle: '@max', initials: 'МВ', online: true, unread: 2,
+    messages: [{ text: 'Проверил события чата.', time: '13:48' }, { text: 'Давай сверим статусы сообщений.', time: '13:51' }] },
+  { name: 'Лера Ким', handle: '@lera', initials: 'ЛК',
+    messages: [{ text: 'Спасибо, получила', time: '12:36' }] },
+  { name: 'Кирилл Орлов', handle: '@kirill', initials: 'КО', unread: 1,
+    messages: [{ text: 'Есть минутка на созвон?', time: '11:10' }] },
+  { name: 'Даша Морозова', handle: '@dasha', initials: 'ДМ',
+    messages: [{ text: 'Увидимся вечером', time: '10:04' }] }
+];
+
+const workspace = document.querySelector('#workspace');
+const list = document.querySelector('#chat-list');
+const search = document.querySelector('#search');
+const messages = document.querySelector('#messages');
+const details = document.querySelector('#details');
+const info = document.querySelector('.info');
+const draft = document.querySelector('#draft');
+const mobile = matchMedia('(max-width: 620px)');
+const overlay = matchMedia('(max-width: 850px)');
+let active = chats[0];
+
+function element(tag, className, content) {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = content;
+  return node;
+}
+
+function renderList() {
+  const query = search.value.trim().toLowerCase();
+  const visible = chats.filter(chat => [chat.name, chat.handle].some(value => value.toLowerCase().includes(query)));
+  list.replaceChildren();
+  if (!visible.length) list.append(element('p', 'empty subtle', 'Чаты не найдены'));
+
+  for (const chat of visible) {
+    const last = chat.messages.at(-1);
+    const row = element('button', 'chat', '');
+    row.type = 'button';
+    row.setAttribute('aria-current', String(chat === active));
+    const avatar = element('span', 'avatar', chat.initials);
+    avatar.setAttribute('aria-hidden', 'true');
+    const content = element('span', '', '');
+    const top = element('span', 'chat-top', '');
+    const bottom = element('span', 'chat-bottom', '');
+    top.append(element('span', 'chat-name', chat.name), element('time', '', last.time));
+    bottom.append(element('span', 'chat-preview', (last.sent ? 'Вы: ' : '') + last.text));
+    if (chat.unread) {
+      const badge = element('span', 'badge', chat.unread);
+      badge.setAttribute('aria-label', 'Непрочитанных: ' + chat.unread);
+      bottom.append(badge);
+    }
+    content.append(top, bottom);
+    row.append(avatar, content);
+    row.addEventListener('click', () => {
+      if (active !== chat) draft.value = '';
+      active = chat;
+      chat.unread = 0;
+      workspace.classList.remove('list-open');
+      renderChat();
+      if (mobile.matches) document.querySelector('.back').focus();
+      else list.querySelector('[aria-current="true"]')?.focus();
+    });
+    list.append(row);
+  }
+}
+
+function messageNode(message) {
+  const bubble = element('article', message.sent ? 'message sent' : 'message', '');
+  bubble.setAttribute('aria-label', message.sent ? 'Вы' : active.name);
+  const meta = element('div', 'message-meta', '');
+  meta.append(element('time', '', message.time));
+  if (message.sent) {
+    const ticks = element('span', 'icon icon-check', '');
+    ticks.setAttribute('role', 'img');
+    ticks.setAttribute('aria-label', 'Отправлено');
+    meta.append(ticks);
+  }
+  bubble.append(element('p', '', message.text), meta);
+  return bubble;
+}
+
+function renderChat() {
+  const status = active.online ? 'в сети' : 'не в сети';
+  for (const prefix of ['thread', 'profile']) {
+    const avatar = document.querySelector('#' + prefix + '-avatar');
+    avatar.textContent = active.initials;
+    document.querySelector('#' + prefix + '-name').textContent = active.name;
+    const label = document.querySelector('#' + prefix + '-status');
+    label.textContent = status;
+    if (active.online) {
+      const dot = element('span', 'status-dot', '');
+      dot.setAttribute('aria-hidden', 'true');
+      label.prepend(dot);
+    }
+  }
+  document.querySelector('#profile-handle').textContent = active.handle;
+  messages.replaceChildren(element('div', 'day mono', 'Сегодня'), ...active.messages.map(messageNode));
+  messages.scrollTop = messages.scrollHeight;
+  renderList();
+}
+
+function showDetails(open) {
+  details.hidden = !open;
+  workspace.classList.toggle('details-hidden', !open);
+  info.setAttribute('aria-expanded', String(open));
+}
+
+search.addEventListener('input', renderList);
+document.querySelector('.back').addEventListener('click', () => {
+  if (overlay.matches) showDetails(false);
+  workspace.classList.add('list-open');
+  list.querySelector('[aria-current="true"]')?.focus();
+});
+info.addEventListener('click', () => showDetails(details.hidden));
+document.querySelector('.close-details').addEventListener('click', () => {
+  showDetails(false);
+  info.focus();
+});
+overlay.addEventListener('change', event => showDetails(!event.matches));
+document.addEventListener('keydown', event => {
+  if (event.key !== '/' || event.altKey || event.ctrlKey || event.metaKey || event.target.closest('input, textarea, [contenteditable]')) return;
+  event.preventDefault();
+  if (mobile.matches) {
+    showDetails(false);
+    workspace.classList.add('list-open');
+  }
+  search.focus();
+});
+document.querySelector('#composer').addEventListener('submit', event => {
+  event.preventDefault();
+  const text = draft.value.trim();
+  if (!text) return;
+  const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const message = { text, time, sent: true };
+  active.messages.push(message);
+  messages.append(messageNode(message));
+  messages.scrollTop = messages.scrollHeight;
+  draft.value = '';
+  draft.focus();
+  renderList();
+});
+
+showDetails(!overlay.matches);
+renderChat();
+</script>
+</body>
+</html>
