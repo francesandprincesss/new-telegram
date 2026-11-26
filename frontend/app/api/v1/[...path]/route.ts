@@ -4,7 +4,7 @@ const cookieName = "chat_session";
 const uuid = "[a-fA-F0-9-]{36}";
 const routes: Record<string, RegExp> = {
   GET: new RegExp(`^(?:users/(?:me|find|${uuid})|dialogs(?:/${uuid}/messages)?|events)$`),
-  POST: new RegExp(`^(?:auth/(?:login|register)|dialogs(?:/${uuid}/(?:messages|read))?)$`),
+  POST: new RegExp(`^(?:auth/(?:login|register)|dialogs(?:/${uuid}/(?:messages|read|typing))?)$`),
   PUT: new RegExp(`^(?:presence/status|messages/${uuid}/reaction)$`),
   DELETE: new RegExp(`^(?:auth/session|messages/${uuid}/reaction)$`),
 };

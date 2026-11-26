@@ -44,6 +44,10 @@ func (h *Handler) SubscribeEvents(_ *chatv1.SubscribeEventsRequest, stream grpc.
 	for {
 		select {
 		case event := <-subscription.Events:
+			// Typing is sent through the browser event stream.
+			if _, typing := event.Payload.(DialogTyping); typing {
+				continue
+			}
 			if err := stream.Send(toEnvelope(event)); err != nil {
 				return err
 			}

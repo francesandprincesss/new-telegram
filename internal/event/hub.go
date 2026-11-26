@@ -120,6 +120,10 @@ func (s *subscriber) send(event Event) bool {
 	if s.closed {
 		return true
 	}
+	// Typing updates expire quickly. Drop them when delivery has a backlog.
+	if _, typing := event.Payload.(DialogTyping); typing && (len(s.events) != 0 || cap(s.events) == 1) {
+		return true
+	}
 	select {
 	case s.events <- event:
 		return true

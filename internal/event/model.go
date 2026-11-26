@@ -53,3 +53,10 @@ type PresenceChanged struct {
 }
 
 func (PresenceChanged) isEventPayload() {}
+
+type DialogTyping struct {
+	DialogID uuid.UUID
+	UserID   uuid.UUID
+}
+
+func (DialogTyping) isEventPayload() {}

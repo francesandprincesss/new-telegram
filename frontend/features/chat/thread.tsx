@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../../lib/api";
 import {
+  applyReadReceipt,
   mergeMessages,
   reactions,
   validateMessage,
@@ -11,7 +12,7 @@ import {
   type Message,
   type ReactionKind,
 } from "../../lib/chat-data";
-import { Avatar, dayLabel, Icon, IconButton, Presence, Timestamp } from "./ui";
+import { Avatar, dayLabel, Icon, IconButton, Presence, Timestamp, TypingIndicator } from "./ui";
 
 type ThreadProps = {
   dialog: Dialog;
@@ -23,6 +24,7 @@ type ThreadProps = {
   onChange: () => void;
   errorMessage: (error: unknown) => string;
   visibleOnMobile: boolean;
+  peerTyping: boolean;
   draft: ComposerDraft;
   sending: boolean;
   updateDraft: (id: string, update: (value: ComposerDraft) => ComposerDraft) => void;
@@ -31,7 +33,7 @@ type ThreadProps = {
 
 export function Thread({
   dialog, userId, revision, details, setDetails, back, onChange, errorMessage, visibleOnMobile,
-  draft, sending, updateDraft, trackSend,
+  peerTyping, draft, sending, updateDraft, trackSend,
 }: ThreadProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [token, setToken] = useState<string | null>(null);
@@ -51,6 +53,8 @@ export function Thread({
   const followLatest = useRef(true);
   const loadedMessages = useRef<Message[]>([]);
   const latestRead = useRef("");
+  const lastTypingAt = useRef(-Infinity);
+  const typingRequest = useRef<AbortController | null>(null);
   const scroll = useRef<{ bottom?: true; height?: number; top?: number } | null>(null);
   const { id, peer } = dialog;
   const messageIds = new Set(messages.map(message => message.id));
@@ -135,16 +139,54 @@ export function Thread({
     };
   }, [visibleOnMobile]);
 
-  const unread = messages.findLast(message => message.sender_id !== userId && !message.read_at)?.id;
   useEffect(() => {
-    if (!viewing || !atEnd || !unread || latestRead.current === unread) return;
-    latestRead.current = unread;
-    // The request may finish even if the reader moves to a different thread.
-    api.read(id, unread).then(onChange, error => {
-      if (latestRead.current === unread) latestRead.current = "";
-      setActionError(errorMessage(error));
-    });
-  }, [viewing, atEnd, unread, id, onChange, errorMessage]);
+    const list = pane.current;
+    if (!viewing || !list) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+
+    function markVisibleMessages(retried = false) {
+      timer = undefined;
+      if (document.hidden || !document.hasFocus() || !list?.clientHeight) return;
+
+      const viewport = list.getBoundingClientRect();
+      const cutoff = loadedMessages.current.findLast(message => {
+        if (message.sender_id === userId || message.read_at) return false;
+        const box = document.getElementById("message-" + message.id)?.getBoundingClientRect();
+        if (!box || !box.height) return false;
+        const visibleHeight = Math.min(box.bottom, viewport.bottom) - Math.max(box.top, viewport.top);
+        return visibleHeight >= Math.min(box.height, viewport.height / 2, 40);
+      });
+      if (!cutoff || latestRead.current === cutoff.id) return;
+
+      latestRead.current = cutoff.id;
+      api.read(id, cutoff.id).then(({ read_at }) => {
+        setMessages(value => applyReadReceipt(value, cutoff.id, userId, read_at));
+        onChange();
+      }, error => {
+        if (latestRead.current !== cutoff.id) return;
+        latestRead.current = "";
+        if (stopped) return;
+        if (retried) setActionError(errorMessage(error));
+        else timer ??= setTimeout(() => markVisibleMessages(true), 750);
+      });
+    }
+
+    function scheduleRead() {
+      timer ??= setTimeout(markVisibleMessages, 120);
+    }
+
+    scheduleRead();
+    list.addEventListener("scroll", scheduleRead, { passive: true });
+    const observer = new ResizeObserver(scheduleRead);
+    observer.observe(list);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      list.removeEventListener("scroll", scheduleRead);
+      observer.disconnect();
+    };
+  }, [viewing, messages, id, userId, onChange, errorMessage]);
 
   async function older() {
     if (!token || moreBusy) return;
@@ -162,6 +204,21 @@ export function Thread({
     } finally {
       setMoreBusy(false);
     }
+  }
+
+  useEffect(() => () => typingRequest.current?.abort(), []);
+
+  function notifyTyping() {
+    const now = performance.now();
+    if (typingRequest.current || now - lastTypingAt.current < 2000) return;
+    lastTypingAt.current = now;
+    const request = new AbortController();
+    typingRequest.current = request;
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(2500)]);
+    // Typing is optional. A lost update must not interrupt the composer.
+    void api.typing(id, signal).catch(() => {}).finally(() => {
+      if (typingRequest.current === request) typingRequest.current = null;
+    });
   }
 
   function replyTo(message: Message) {
@@ -203,6 +260,9 @@ export function Thread({
     setActionError(validation);
     if (validation) return;
     const body = draft.body.trim();
+    typingRequest.current?.abort();
+    typingRequest.current = null;
+    lastTypingAt.current = -Infinity;
     trackSend(id, true);
     try {
       const message = await api.send(id, body, draft.replyTo?.id);
@@ -246,7 +306,9 @@ export function Thread({
           <Avatar username={peer.username} />
           <div className="thread-user">
             <h2>{peer.username}</h2>
-            <div className="subtle"><Presence status={peer.status} /></div>
+            <div className="subtle" role="status">
+              {peerTyping ? <TypingIndicator /> : <Presence status={peer.status} />}
+            </div>
           </div>
           <IconButton ref={info} name="details" label="Сведения о чате" className="info"
             aria-controls="chat-details" aria-expanded={details} onClick={() => setDetails(!details)} />
@@ -337,6 +399,7 @@ export function Thread({
             <textarea rows={1} ref={input} value={draft.body} onChange={event => {
               const body = event.target.value;
               updateDraft(id, value => ({ ...value, body }));
+              if (body.trim()) notifyTyping();
             }}
               onKeyDown={event => {
                 if (event.nativeEvent.isComposing) return;

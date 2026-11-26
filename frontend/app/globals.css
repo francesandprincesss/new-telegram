@@ -79,6 +79,18 @@ time { flex: none; color: var(--muted) }
 .thread-head { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 24px; min-height: var(--header-height); border-bottom: 1px solid var(--line); background: var(--panel) }
 .thread-head h2 { font-size: 16px; font-weight: 500 }
 .thread-head .subtle { display: block }
+.typing-indicator { display: inline-flex; align-items: center; gap: 5px; color: var(--accent) }
+.typing-dots { display: inline-flex; gap: 3px }
+.typing-dots > span { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .65 }
+@media (prefers-reduced-motion: no-preference) {
+  .typing-dots > span { animation: typing-wave 1.2s ease-in-out infinite }
+  .typing-dots > span:nth-child(2) { animation-delay: .14s }
+  .typing-dots > span:nth-child(3) { animation-delay: .28s }
+}
+@keyframes typing-wave {
+  0%, 46%, 100% { transform: translateY(0); opacity: .65 }
+  23% { transform: translateY(-3px); opacity: 1 }
+}
 .thread-head .info { margin-left: auto }
 .icon-button { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 8px; color: var(--muted) }
 .icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--surface); color: var(--text) }
@@ -192,6 +204,14 @@ input::placeholder, textarea::placeholder { color: var(--muted) }
 
 @layer components {
   .icon-check.is-read { color: var(--accent); }
+  .icon-check.is-read::after {
+    content: "";
+    width: 7px;
+    height: 5px;
+    inset: 4px auto auto 8px;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+  }
 }
 
 @layer components {

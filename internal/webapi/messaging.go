@@ -8,6 +8,7 @@ import (
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
 	"github.com/francesandprincesss/new-telegram/internal/chat"
+	"github.com/francesandprincesss/new-telegram/internal/event"
 	"github.com/francesandprincesss/new-telegram/internal/message"
 	"github.com/francesandprincesss/new-telegram/internal/reaction"
 	"github.com/francesandprincesss/new-telegram/internal/readreceipt"
@@ -18,6 +19,7 @@ import (
 type dialogService interface {
 	CreateDirectDialog(context.Context, uuid.UUID, uuid.UUID) (chat.Dialog, error)
 	ListDialogs(context.Context, uuid.UUID, int, string) ([]chat.Dialog, string, error)
+	PeerInDialog(context.Context, uuid.UUID, uuid.UUID) (uuid.UUID, error)
 }
 
 type messageService interface {
@@ -52,6 +54,7 @@ func (s *Server) registerMessagingRoutes(mux *http.ServeMux) {
 	protected("GET /api/v1/dialogs/{dialog_id}/messages", s.listMessages)
 	protected("POST /api/v1/dialogs/{dialog_id}/messages", s.sendMessage)
 	protected("POST /api/v1/dialogs/{dialog_id}/read", s.markRead)
+	protected("POST /api/v1/dialogs/{dialog_id}/typing", s.typing)
 	protected("PUT /api/v1/messages/{message_id}/reaction", s.setReaction)
 	protected("DELETE /api/v1/messages/{message_id}/reaction", s.removeReaction)
 }
@@ -272,6 +275,27 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 		Messages []messageResponse `json:"messages"`
 		PageInfo pageInfo          `json:"page_info"`
 	}{Messages: messages, PageInfo: pageInfo{NextPageToken: next}})
+}
+
+func (s *Server) typing(w http.ResponseWriter, r *http.Request) {
+	dialogID, ok := requestID(w, "dialog_id", r.PathValue("dialog_id"))
+	if !ok {
+		return
+	}
+	actorID, _ := session.UserID(r.Context())
+	peer, err := s.messaging.Dialogs.PeerInDialog(r.Context(), dialogID, actorID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if r.Context().Err() != nil {
+		return
+	}
+	s.hub.PublishTo([]uuid.UUID{peer}, event.Event{
+		ID: uuid.New(), OccurredAt: time.Now().UTC(),
+		Payload: event.DialogTyping{DialogID: dialogID, UserID: actorID},
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) markRead(w http.ResponseWriter, r *http.Request) {

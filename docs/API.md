@@ -166,6 +166,7 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 | `POST /api/v1/dialogs` | `{other_user_id}` | Новый или существующий личный диалог |
 | `GET /api/v1/dialogs/{dialog_id}/messages` | — | `{messages, page_info}` |
 | `POST /api/v1/dialogs/{dialog_id}/messages` | `{body, reply_to_message_id?}` | Отправленное сообщение |
+| `POST /api/v1/dialogs/{dialog_id}/typing` | `{}` | `204 No Content` |
 | `POST /api/v1/dialogs/{dialog_id}/read` | `{up_to_message_id}` | `{marked_count, read_at}` |
 | `PUT /api/v1/messages/{message_id}/reaction` | `{reaction}` | Реакция пользователя |
 | `DELETE /api/v1/messages/{message_id}/reaction` | — | `{removed}` |
@@ -180,6 +181,11 @@ data: {"event_id":"...","type":"presence.changed","payload":{"user_id":"...","st
 в том же диалоге. При успешной отправке и чтении истории у ответа есть
 поле `reply_to` с `id`, `sender_id` и текстом превью в `excerpt`. Событие SSE
 `message.created` для ответа также содержит `reply_to_message_id`.
+
+POST на маршрут `typing` отправляет только собеседнику событие SSE
+`dialog.typing` с `dialog_id` и `user_id`. Веб-клиент отправляет обновления
+максимум раз в две секунды. Статус исчезает через пять секунд после последнего
+события или при получении сообщения от собеседника.
 
 Участники диалога получают события `message.created`, `messages.read` и
 `reaction.changed`. После переподключения клиент запрашивает актуальные данные.

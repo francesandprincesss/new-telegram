@@ -60,8 +60,10 @@ export const api = {
     request<{ messages: Message[]; page_info: PageInfo }>(`/dialogs/${id}/messages` + page(token), { signal }),
   send: (id: string, body: string, replyTo?: string) =>
     request<Message>(`/dialogs/${id}/messages`, { method: "POST", data: { body, reply_to_message_id: replyTo } }),
+  typing: (id: string, signal: AbortSignal) =>
+    request<void>(`/dialogs/${id}/typing`, { method: "POST", data: {}, signal }),
   read: (id: string, messageId: string, signal?: AbortSignal) =>
-    request<unknown>(`/dialogs/${id}/read`, { method: "POST", data: { up_to_message_id: messageId }, signal }),
+    request<{ read_at: string }>(`/dialogs/${id}/read`, { method: "POST", data: { up_to_message_id: messageId }, signal }),
   react: (id: string, reaction: ReactionKind | null) => reaction
     ? request<Reaction>(`/messages/${id}/reaction`, { method: "PUT", data: { reaction } })
     : request<{ removed: boolean }>(`/messages/${id}/reaction`, { method: "DELETE" }),

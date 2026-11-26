@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeMessages, validateCredentials, validateMessage, type Message } from "../lib/chat-data.ts";
+import { applyReadReceipt, mergeMessages, validateCredentials, validateMessage, type Message } from "../lib/chat-data.ts";
 import { eventStreamParser, readEventStream } from "../lib/sse.ts";
 
 test("history deduplicates by ID and preserves PostgreSQL timestamp order", () => {
@@ -12,6 +12,18 @@ test("history deduplicates by ID and preserves PostgreSQL timestamp order", () =
   const third = message("a", "2026-11-25T10:15:05.000101Z");
   const read = { ...second, read_at: "2026-11-25T10:17:00Z" };
   assert.deepEqual(mergeMessages([second, third], [read, first]), [first, read, third]);
+  assert.deepEqual(mergeMessages([read], [second]), [read]);
+});
+
+test("confirmed receipts cover only incoming messages through the cutoff", () => {
+  const messages = ["peer", "reader", "peer", "peer"].map((sender_id, index): Message => ({
+    id: String(index), created_at: "2026-11-25T10:15:05Z", dialog_id: "chat",
+    sender_id, body: String(index), read_at: null, reactions: [],
+  }));
+  const readAt = "2026-11-25T10:17:00Z";
+  assert.deepEqual(applyReadReceipt(messages, "2", "reader", readAt).map(message => message.read_at),
+    [readAt, null, readAt, null]);
+  assert.deepEqual(applyReadReceipt(messages, "missing", "reader", readAt), messages);
 });
 
 test("registration counts Unicode code points while login accepts short legacy passwords", () => {

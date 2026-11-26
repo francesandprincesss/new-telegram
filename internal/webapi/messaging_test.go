@@ -11,6 +11,7 @@ import (
 
 	"github.com/francesandprincesss/new-telegram/internal/apperror"
 	"github.com/francesandprincesss/new-telegram/internal/chat"
+	"github.com/francesandprincesss/new-telegram/internal/event"
 	"github.com/francesandprincesss/new-telegram/internal/message"
 	"github.com/francesandprincesss/new-telegram/internal/reaction"
 	"github.com/francesandprincesss/new-telegram/internal/readreceipt"
@@ -37,6 +38,13 @@ func (s messagingStub) ListDialogs(_ context.Context, actor uuid.UUID, size int,
 		return nil, "", apperror.New(apperror.CodeInvalidArgument, "invalid dialog page")
 	}
 	return []chat.Dialog{s.dialog}, "dial-next", nil
+}
+
+func (s messagingStub) PeerInDialog(_ context.Context, dialog, actor uuid.UUID) (uuid.UUID, error) {
+	if actor != s.actorID || dialog != s.dialog.ID {
+		return uuid.Nil, apperror.New(apperror.CodeForbidden, "not a participant")
+	}
+	return s.peerID, nil
 }
 
 func (s messagingStub) SendMessage(_ context.Context, actor, dialog uuid.UUID, body string, _ *uuid.UUID) (message.Message, error) {
@@ -158,6 +166,7 @@ func TestMessagingRoutesRequireBearerToken(t *testing.T) {
 		{http.MethodGet, "/api/v1/dialogs/invalid/messages"},
 		{http.MethodPost, "/api/v1/dialogs/invalid/messages"},
 		{http.MethodPost, "/api/v1/dialogs/invalid/read"},
+		{http.MethodPost, "/api/v1/dialogs/invalid/typing"},
 		{http.MethodPut, "/api/v1/messages/invalid/reaction"},
 		{http.MethodDelete, "/api/v1/messages/invalid/reaction"},
 	} {
@@ -167,5 +176,42 @@ func TestMessagingRoutesRequireBearerToken(t *testing.T) {
 		if response.Code != http.StatusUnauthorized {
 			t.Errorf("%s %s status = %d, want 401", endpoint.method, endpoint.path, response.Code)
 		}
+	}
+}
+
+func TestTypingOnlyReachesPeer(t *testing.T) {
+	server, actor, _ := newTestServer()
+	dialogID, peer, outsider := uuid.New(), uuid.New(), uuid.New()
+	server.messaging.Dialogs = messagingStub{actorID: actor, peerID: peer, dialog: chat.Dialog{ID: dialogID}}
+
+	peerSubscription := server.hub.Subscribe(peer)
+	defer peerSubscription.Cancel()
+	ownSubscription := server.hub.Subscribe(actor)
+	defer ownSubscription.Cancel()
+	otherSubscription := server.hub.Subscribe(outsider)
+	defer otherSubscription.Cancel()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/dialogs/"+dialogID.String()+"/typing", nil)
+	req.Header.Set("Authorization", "Bearer demo")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, req)
+	if response.Code != http.StatusNoContent || response.Body.Len() != 0 {
+		t.Fatalf("typing response = %d %s", response.Code, response.Body.String())
+	}
+
+	select {
+	case got := <-peerSubscription.Events:
+		if got.Payload != (event.DialogTyping{DialogID: dialogID, UserID: actor}) {
+			t.Fatalf("unexpected typing payload: %#v", got.Payload)
+		}
+	default:
+		t.Fatal("peer did not receive a typing event")
+	}
+	select {
+	case <-ownSubscription.Events:
+		t.Fatal("sender received their own typing event")
+	case <-otherSubscription.Events:
+		t.Fatal("outsider received a typing event")
+	default:
 	}
 }

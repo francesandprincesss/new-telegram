@@ -64,10 +64,23 @@ function compareTime(a: string, b: string) {
 
 export function mergeMessages(previous: Message[], fresh: Message[]) {
   const messages = new Map(previous.map(message => [message.id, message]));
-  for (const message of fresh) messages.set(message.id, message);
+  for (const message of fresh) {
+    const knownReadAt = messages.get(message.id)?.read_at;
+    messages.set(message.id, knownReadAt && !message.read_at
+      ? { ...message, read_at: knownReadAt }
+      : message);
+  }
   return [...messages.values()].sort((a, b) =>
     compareTime(a.created_at, b.created_at) || a.id.localeCompare(b.id)
   );
+}
+
+export function applyReadReceipt(messages: Message[], cutoffId: string, readerId: string, readAt: string) {
+  const cutoff = messages.findIndex(message => message.id === cutoffId);
+  if (cutoff < 0) return messages;
+  return messages.map((message, index) => index <= cutoff && message.sender_id !== readerId && !message.read_at
+    ? { ...message, read_at: readAt }
+    : message);
 }
 
 export function mergeDialogs(previous: Dialog[], fresh: Dialog[]) {

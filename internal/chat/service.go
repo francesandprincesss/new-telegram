@@ -63,6 +63,21 @@ func (s *Service) Participants(ctx context.Context, dialogID uuid.UUID) ([2]uuid
 	return s.repository.Participants(ctx, dialogID)
 }
 
+func (s *Service) PeerInDialog(ctx context.Context, dialogID, actorID uuid.UUID) (uuid.UUID, error) {
+	participants, err := s.repository.Participants(ctx, dialogID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	switch actorID {
+	case participants[0]:
+		return participants[1], nil
+	case participants[1]:
+		return participants[0], nil
+	default:
+		return uuid.Nil, apperror.New(apperror.CodeForbidden, "dialog access denied")
+	}
+}
+
 func (s *Service) PeerIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
 	return s.repository.PeerIDs(ctx, userID)
 }

@@ -3,14 +3,50 @@
 import { useEffect, useState } from "react";
 import { readEventStream } from "../../lib/sse";
 
-export function useEvents(onRefresh: () => void, onExpired: () => void) {
+const typingTimeout = 5_000;
+
+export function useEvents(userId: string, onRefresh: () => void, onExpired: () => void) {
   const [connected, setConnected] = useState(false);
+  const [typingDialogs, setTypingDialogs] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout>;
     let refresh: ReturnType<typeof setTimeout> | undefined;
     let wait = 1000;
+    const typing = new Map<string, ReturnType<typeof setTimeout>>();
+
+    function clearTyping(dialogId: string) {
+      if (!typing.has(dialogId)) return;
+      clearTimeout(typing.get(dialogId));
+      typing.delete(dialogId);
+      setTypingDialogs(new Set(typing.keys()));
+    }
+
+    function resetTyping() {
+      for (const timer of typing.values()) clearTimeout(timer);
+      typing.clear();
+    }
+
+    function handleTypingEvent(name: string, data: string) {
+      let payload: { dialog_id?: unknown; user_id?: unknown; sender_id?: unknown } | undefined;
+      try {
+        payload = JSON.parse(data)?.payload;
+      } catch {
+        return;
+      }
+      const dialogId = payload?.dialog_id;
+      if (typeof dialogId !== "string") return;
+      if (name === "message.created") {
+        if (typeof payload?.sender_id === "string" && payload.sender_id !== userId) clearTyping(dialogId);
+        return;
+      }
+      if (typeof payload?.user_id !== "string" || payload.user_id === userId) return;
+      const previous = typing.get(dialogId);
+      clearTimeout(previous);
+      typing.set(dialogId, setTimeout(() => clearTyping(dialogId), typingTimeout));
+      if (!previous) setTypingDialogs(new Set(typing.keys()));
+    }
 
     function scheduleRefresh() {
       if (refresh) return;
@@ -34,7 +70,11 @@ export function useEvents(onRefresh: () => void, onExpired: () => void) {
         wait = 1000;
         setConnected(true);
         scheduleRefresh();
-        await readEventStream(response.body, name => {
+        await readEventStream(response.body, (name, data) => {
+          if (controller.signal.aborted) return;
+          if (name === "dialog.typing" || (name === "message.created" && typing.size)) {
+            handleTypingEvent(name, data);
+          }
           if (["message.created", "messages.read", "reaction.changed", "presence.changed"].includes(name)) {
             scheduleRefresh();
           }
@@ -44,6 +84,10 @@ export function useEvents(onRefresh: () => void, onExpired: () => void) {
       }
       if (controller.signal.aborted) return;
       setConnected(false);
+      if (typing.size) {
+        resetTyping();
+        setTypingDialogs(new Set());
+      }
       retry = setTimeout(connect, wait);
       wait = Math.min(wait * 2, 15_000);
     }
@@ -53,8 +97,9 @@ export function useEvents(onRefresh: () => void, onExpired: () => void) {
       controller.abort();
       clearTimeout(retry);
       clearTimeout(refresh);
+      resetTyping();
     };
-  }, [onRefresh, onExpired]);
+  }, [userId, onRefresh, onExpired]);
 
-  return connected;
+  return { connected, typingDialogs };
 }

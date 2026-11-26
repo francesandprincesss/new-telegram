@@ -34,7 +34,7 @@ type Server struct {
 	users     userService
 	presence  presenceService
 	tokens    auth.TokenVerifier
-	hub       eventSubscriber
+	hub       eventBus
 	observer  event.ConnectionObserver
 	messaging Messaging
 	handler   http.Handler
@@ -54,15 +54,16 @@ type presenceService interface {
 	SetStatus(context.Context, uuid.UUID, presence.Status) (presence.State, error)
 }
 
-type eventSubscriber interface {
+type eventBus interface {
 	Subscribe(uuid.UUID) *event.Subscription
+	PublishTo([]uuid.UUID, event.Event)
 }
 
 type expiringVerifier interface {
 	VerifyWithExpiry(string) (uuid.UUID, time.Time, error)
 }
 
-func New(authService authService, userService userService, presenceService presenceService, tokens auth.TokenVerifier, hub eventSubscriber, observer event.ConnectionObserver, messaging Messaging) *Server {
+func New(authService authService, userService userService, presenceService presenceService, tokens auth.TokenVerifier, hub eventBus, observer event.ConnectionObserver, messaging Messaging) *Server {
 	s := &Server{auth: authService, users: userService, presence: presenceService, tokens: tokens, hub: hub, observer: observer, messaging: messaging}
 	s.handler = s.routes()
 	return s

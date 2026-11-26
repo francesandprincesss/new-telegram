@@ -31,6 +31,15 @@ export function Presence({ status }: { status: Status }) {
   );
 }
 
+export function TypingIndicator() {
+  return (
+    <span className="typing-indicator">
+      печатает
+      <span className="typing-dots" aria-hidden="true"><span /><span /><span /></span>
+    </span>
+  );
+}
+
 const timeFormat = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
 const dayFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 const shortDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });

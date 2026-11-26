@@ -42,3 +42,30 @@ func TestHubDisconnectsSlowConsumer(t *testing.T) {
 		t.Fatal("slow consumer was not disconnected")
 	}
 }
+
+func TestTypingDoesNotDisplaceQueuedMessages(t *testing.T) {
+	hub := NewHub(2)
+	userID := uuid.New()
+	sub := hub.Subscribe(userID)
+	defer sub.Cancel()
+	recipients := []uuid.UUID{userID}
+	first, second := Event{ID: uuid.New()}, Event{ID: uuid.New()}
+	hub.PublishTo(recipients, first)
+	hub.PublishTo(recipients, Event{Payload: DialogTyping{}})
+	hub.PublishTo(recipients, second)
+	for _, want := range []Event{first, second} {
+		select {
+		case got := <-sub.Events:
+			if got.ID != want.ID {
+				t.Fatalf("event ID = %s, want %s", got.ID, want.ID)
+			}
+		default:
+			t.Fatalf("queued event %s was lost", want.ID)
+		}
+	}
+	select {
+	case <-sub.Done:
+		t.Fatal("typing event disconnected the subscriber")
+	default:
+	}
+}

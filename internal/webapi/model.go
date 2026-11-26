@@ -38,6 +38,8 @@ func eventName(value event.Event) string {
 		return "message.created"
 	case event.MessagesRead:
 		return "messages.read"
+	case event.DialogTyping:
+		return "dialog.typing"
 	case event.ReactionChanged:
 		return "reaction.changed"
 	default:
@@ -58,6 +60,8 @@ func eventResult(value event.Event) map[string]any {
 		result["payload"] = messagePayload
 	case event.MessagesRead:
 		result["payload"] = map[string]any{"dialog_id": payload.DialogID, "reader_id": payload.ReaderID, "up_to_message_id": payload.UpToMessageID, "read_at": payload.ReadAt}
+	case event.DialogTyping:
+		result["payload"] = map[string]any{"dialog_id": payload.DialogID, "user_id": payload.UserID}
 	case event.ReactionChanged:
 		result["payload"] = map[string]any{"message_id": payload.MessageID, "user_id": payload.UserID, "reaction": payload.Reaction, "removed": payload.Removed, "updated_at": payload.UpdatedAt}
 	default:

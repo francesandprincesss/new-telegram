@@ -97,6 +97,10 @@ try {
   streamB = await listen(bob);
   const path = `/dialogs/${dialog.id}`;
   assert.equal((await outsider(path + "/messages")).status, 403);
+  assert.equal((await outsider(path + "/typing", "POST", {})).status, 403);
+  assert.equal((await alice(path + "/typing", "POST", {})).status, 204);
+  await streamB.has("dialog.typing", "dialog_id", dialog.id);
+  await streamB.has("dialog.typing", "user_id", a.id);
   const first = await json<Message>(await alice(path + "/messages", "POST", { body: "Первое сообщение" }), 201);
   await streamB.has("message.created", "message_id", first.id);
   const anotherDialog = await json<Dialog>(await bob("/dialogs", "POST", { other_user_id: other.id }), 200);
@@ -153,4 +157,4 @@ try {
 
 assert.equal((await bob("/auth/login", "POST", { username: b.username, password })).status, 200);
 assert.equal((await json<Identity>(await bob("/users/me"), 200)).id, b.id);
-console.log("Passed: sessions, CSRF, user search, dialogue identity, membership, SSE, message history, quoted replies, read receipts, reactions and presence.");
+console.log("Passed: sessions, CSRF, user search, dialogue identity, membership, SSE, message history, quoted replies, typing, read receipts, reactions and presence.");

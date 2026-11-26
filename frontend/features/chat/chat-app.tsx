@@ -5,7 +5,7 @@ import { api, ApiError, errorText } from "../../lib/api";
 import { mergeDialogs, statusLabels, type ComposerDraft, type Dialog, type Status, type User } from "../../lib/chat-data";
 import { AuthForm } from "./auth-form";
 import { Thread } from "./thread";
-import { Avatar, Icon, IconButton, Timestamp } from "./ui";
+import { Avatar, Icon, IconButton, Timestamp, TypingIndicator } from "./ui";
 import { useEvents } from "./use-events";
 
 type Session = { user?: User; loading?: boolean; error?: string };
@@ -65,7 +65,7 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
   const [finding, setFinding] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
-  const connected = useEvents(refresh, onExpired);
+  const { connected, typingDialogs } = useEvents(user.id, refresh, onExpired);
   const active = dialogs.find(dialog => dialog.id === activeId);
 
   function updateDraft(id: string, update: (draft: ComposerDraft) => ComposerDraft) {
@@ -210,6 +210,7 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
         <div className="chat-list">
           {visible.map(dialog => {
             const draft = drafts.get(dialog.id)?.body.trim();
+            const peerTyping = typingDialogs.has(dialog.id);
             return (
               <button key={dialog.id} type="button" className="chat" aria-current={active?.id === dialog.id}
                 onClick={() => openDialog(dialog.id)}>
@@ -220,11 +221,13 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
                     {dialog.last_message && <Timestamp value={dialog.last_message.created_at} compact />}
                   </span>
                   <span className="chat-bottom">
-                    <span className="chat-preview">{draft
-                      ? <><strong className="draft-label">Черновик</strong> {draft}</>
-                      : dialog.last_message
-                        ? (dialog.last_message.sender_id === user.id ? "Вы: " : "") + dialog.last_message.body
-                        : "Сообщений пока нет"}</span>
+                    <span className="chat-preview">{peerTyping
+                      ? <TypingIndicator />
+                      : draft
+                        ? <><strong className="draft-label">Черновик</strong> {draft}</>
+                        : dialog.last_message
+                          ? (dialog.last_message.sender_id === user.id ? "Вы: " : "") + dialog.last_message.body
+                          : "Сообщений пока нет"}</span>
                     {dialog.unread_count > 0 && <span className="badge" aria-label={`Непрочитанных: ${dialog.unread_count}`}>{dialog.unread_count}</span>}
                   </span>
                 </span>
@@ -261,7 +264,7 @@ function Workspace({ user, onExpired }: { user: User; onExpired: () => void }) {
       {active
         ? <Thread key={active.id} dialog={active} userId={user.id} revision={revision} details={details}
             setDetails={setDetails} back={back} onChange={refresh} errorMessage={errorMessage}
-            visibleOnMobile={threadOpen} draft={drafts.get(active.id) ?? emptyDraft}
+            visibleOnMobile={threadOpen} peerTyping={typingDialogs.has(active.id)} draft={drafts.get(active.id) ?? emptyDraft}
             sending={sending.has(active.id)} updateDraft={updateDraft} trackSend={trackSend} />
         : <section className="conversation" aria-label="Переписка">
           <div className="empty-thread">
